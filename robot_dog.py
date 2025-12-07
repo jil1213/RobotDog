@@ -6,17 +6,19 @@ import numpy as np
 def RobotDog(SC, mbs, 
             platformInertia = None,
             legInertia = None,
-            platformPosition = [0,0,0], #this is the location of the platform ground centerpoint
-            legDistance = 0.4,        #wheel midpoint-to-midpoint distance
-            platformHeight = 0.1,
-            platformRadius = 0.22,
+            referenceCoordinates = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            L_body = 1.0,   #Länge Body
+            W_body = 0.3,
+            H_body = 0.2,
             platformMass = 5,
             platformGroundOffset = 0.02,
             planarPlatform = True,
             dimGroundX = 8, dimGroundY = 8,
             gravity = [0,0,-9.81],
-            legRadius = 0.04,
-            legThickness = 0.01,
+            L_thigh = 0.3,
+            L_shin  = 0.2,
+            W_leg = 0.1,
+            density = 500,
             legMass = 0.05,
             pControl = 0,
             dControl = 0.02,
@@ -36,17 +38,9 @@ def RobotDog(SC, mbs,
     # -------------------------------------------------
     # Parameter
     # -------------------------------------------------
-    L_body = 1.0   #Länge Body
-    W_body = 0.3
-    H_body = 0.2
 
     body_offset = 0.8  # Fallhöhe des Bodys über dem Boden
 
-    L_thigh = 0.3
-    L_shin  = 0.2
-    W_leg = 0.1
-    density = 500
-    gravity = [0,0,-9.81]
 
     # -------------------------------------------------
     # Boden
@@ -99,8 +93,7 @@ def RobotDog(SC, mbs,
     # -------------------------------------------------
     # 3 Plattform XYZ-Translation + 3 Plattform Drehung + 4 Hüfte + 4 Knie = 14 DOF
     rd.nJoints = 3 + 3 + 4 + 4 
-
-    referenceCoordinates = [0]*rd.nJoints
+    # referenceCoordinates = [0]*rd.nJoints
     deg=math.pi/180
 
     # initialAngles = [
@@ -379,11 +372,8 @@ mbs = SC.AddSystem()
 
 useGeneralContact = False
 usePenalty = True
-legRadius = 0.04
-legDistance = 0.4
 rd = RobotDog(SC, mbs,useGeneralContact=useGeneralContact, 
-                                usePenalty=usePenalty, planarPlatform=True,
-                                legRadius=legRadius, legDistance=legDistance)
+                                usePenalty=usePenalty, planarPlatform=True)
 mbs.Assemble()
 
 
