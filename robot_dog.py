@@ -9,10 +9,11 @@ mbs = SC.AddSystem()
 # -------------------------------------------------
 # Parameter
 # -------------------------------------------------
-L_body = 1.0
+L_body = 1.0   #Länge Body
 W_body = 0.3
 H_body = 0.2
-body_offset = 0.8
+
+body_offset = 0.8  # Fallhöhe des Bodys über dem Boden
 
 L_thigh = 0.3
 L_shin  = 0.2
@@ -29,6 +30,7 @@ oGround = mbs.AddObject(ObjectGround(referencePosition=[0,0,0],
 
 mGround = mbs.AddMarker(MarkerBodyRigid(bodyNumber=oGround))
 
+###   Kontakt mit dem Bode ------
 gContact = mbs.AddGeneralContact()
 gContact.frictionProportionalZone = 0.01
 gContact.SetFrictionPairings(np.diag([1.0, 0.0]))  # Material 0 hat Reibung, 1 nicht
@@ -49,6 +51,7 @@ gContact.AddTrianglesRigidBodyBased(
     pointList = meshPoints,
     triangleList = meshTrigs
 )
+### End eKontakt mit dem Boden ------
 
 # -------------------------------------------------
 # Inertias
@@ -60,8 +63,8 @@ shinInertia  = InertiaCuboid(density, [W_leg, W_leg, L_shin]).Translated([0,0,0]
 # -------------------------------------------------
 # Node
 # -------------------------------------------------
-# 3 Plattform DOF + 4 Hüfte + 4 Knie = 11 DOF
-nJoints = 3 + 4 + 4 + 3
+# 3 Plattform XYZ-Translation + 3 Plattform Drehung + 4 Hüfte + 4 Knie = 14 DOF
+nJoints = 3 + 3 + 4 + 4 
 
 referenceCoordinates = [0]*nJoints
 deg=math.pi/180
@@ -79,7 +82,7 @@ deg=math.pi/180
 # ]
 initialAngles = [
     0,0,body_offset,0,0,0,
-0,0,0,0,-0.1,-0.1,-0.1,-0.1
+0,0,0,0,-1,-0.1,-0.1,-0.1
 ]
 
 
@@ -108,7 +111,7 @@ jointTypes += [exu.JointType.RevoluteY]*4
 jointTypes += [exu.JointType.RevoluteY]*4
 
 
-linkParents = [-1, 0, 1,2,3,4, 5, 5, 5, 5, 6, 7, 8, 9]
+linkParents = [-1, 0, 1,2,3,4, 5, 5, 5, 5, 6, 7, 8, 9] #    
 
 platformIndex = 5
 print(len(jointTypes))
@@ -312,6 +315,27 @@ for pos in offsets:
         contactDamping=1e3,
         frictionMaterialIndex=0
     )
+
+
+
+
+sPlatformPos = mbs.AddSensor(SensorKinematicTree(objectNumber=oKT, linkNumber = platformIndex,
+                                                        storeInternal=True, outputVariableType=exu.OutputVariableType.Position))
+sPlatformVel = mbs.AddSensor(SensorKinematicTree(objectNumber=oKT, linkNumber = platformIndex,
+                                                        storeInternal=True, outputVariableType=exu.OutputVariableType.Velocity))
+sPlatformAng = mbs.AddSensor(SensorKinematicTree(objectNumber=oKT, linkNumber = platformIndex,
+                                                        storeInternal=True, outputVariableType=exu.OutputVariableType.Rotation))
+sPlatformAngVel = mbs.AddSensor(SensorKinematicTree(objectNumber=oKT, linkNumber = platformIndex,
+                                                        storeInternal=True, outputVariableType=exu.OutputVariableType.AngularVelocity))
+
+
+for i in range(8):
+    mbs.AddSensor(SensorKinematicTree(objectNumber=oKT, linkNumber = platformIndex+1+i,
+                                                            storeInternal=True, outputVariableType=exu.OutputVariableType.Rotation))
+    mbs.AddSensor(SensorKinematicTree(objectNumber=oKT, linkNumber = platformIndex+1+i,
+                                                            storeInternal=True, outputVariableType=exu.OutputVariableType.AngularVelocity))    
+
+
 
 # -------------------------------------------------
 # Render
