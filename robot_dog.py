@@ -12,7 +12,6 @@ def RobotDog(SC, mbs,
             H_body = 0.2,
             platformMass = 5,
             body_offset = 0.8,  # Fallhöhe des Bodys über dem Boden
-            planarPlatform = True,
             dimGroundX = 8, dimGroundY = 8,
             gravity = [0,0,-9.81],
             L_thigh = 0.3,
@@ -23,10 +22,9 @@ def RobotDog(SC, mbs,
             pControl = 0,
             dControl = 0.02,
             usePenalty = True, #use penalty formulation in case useGeneralContact=False
-            frictionProportionalZone = 0.025,
+            frictionProportionalZone = 0.01, # own parameter other example has 0.025
             frictionCoeff = 1, stiffnessGround = 1e5,
             gContact = None, 
-            frictionIndexWheel = None, frictionIndexFree = None, 
             useGeneralContact = False #generalcontact shows large errors currently
             ):
     #add class which can be returned to enable user to access parameters
@@ -36,16 +34,24 @@ def RobotDog(SC, mbs,
     # -------------------------------------------------
     # Boden
     # -------------------------------------------------
-    rd.gGround = graphics.CheckerBoard(normal=[0,0,1], size=8, size2=8, nTiles=8, zOffset=-1e-5)
+    rd.gGround = graphics.CheckerBoard(normal=[0,0,1], size=dimGroundX, size2=dimGroundY, nTiles=8, zOffset=-1e-5)
     rd.oGround = mbs.AddObject(ObjectGround(referencePosition=[0,0,0],
                                         visualization=VObjectGround(graphicsData=[rd.gGround])))
 
     rd.mGround = mbs.AddMarker(MarkerBodyRigid(bodyNumber=rd.oGround))
 
-    ###   Kontakt mit dem Bode ------
+    ###   Kontakt mit dem Boden ------
+    rd.frictionCoeff = frictionCoeff
+    rd.stiffnessGround = stiffnessGround
+    rd.dampingGround = rd.stiffnessGround*0.01
+    #if gContact == None and useGeneralContact: # it has to be initialized all the time to run the simulation
+    frictionIndexGround = 0
+    frictionIndexFree = 1
+
     rd.gContact = mbs.AddGeneralContact()
-    rd.gContact.frictionProportionalZone = 0.01
-    rd.gContact.SetFrictionPairings(np.diag([1.0, 0.0]))  # Material 0 hat Reibung, 1 nicht
+    rd.gContact.frictionProportionalZone = frictionProportionalZone
+
+    rd.gContact.SetFrictionPairings(np.diag([rd.frictionCoeff, 0.0]))  # Material 0 hat Reibung, 1 nicht
 
     # WICHTIG: Suchbaum-Box manuell setzen (verhindert "size must not be zero")
     rd.gContact.SetSearchTreeBox(
@@ -57,9 +63,9 @@ def RobotDog(SC, mbs,
 
     rd.gContact.AddTrianglesRigidBodyBased(
         rigidBodyMarkerIndex = rd.mGround,
-        contactStiffness = 1e5,
-        contactDamping = 1e3,
-        frictionMaterialIndex = 0,
+        contactStiffness = frictionProportionalZone,
+        contactDamping = rd.dampingGround,
+        frictionMaterialIndex = frictionIndexGround,
         pointList = meshPoints,
         triangleList = meshTrigs
     )
@@ -100,7 +106,7 @@ def RobotDog(SC, mbs,
     # ]
     initialAngles = [
         0,0,body_offset,0,0,0,
-    0,0,0,0,-1,-0.1,-0.1,-0.1
+    0,0,0,0,-0.1,-0.1,-0.1,-0.1
     ]
 
 
@@ -364,7 +370,7 @@ mbs = SC.AddSystem()
 useGeneralContact = False
 usePenalty = True
 rd = RobotDog(SC, mbs,useGeneralContact=useGeneralContact, 
-                                usePenalty=usePenalty, planarPlatform=True)
+                                usePenalty=usePenalty)
 mbs.Assemble()
 
 
