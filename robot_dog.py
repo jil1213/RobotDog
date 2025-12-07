@@ -5,9 +5,9 @@ import numpy as np
 
 def RobotDog(SC, mbs, 
             platformInertia = None,
-            wheelInertia = None,
+            legInertia = None,
             platformPosition = [0,0,0], #this is the location of the platform ground centerpoint
-            wheelDistance = 0.4,        #wheel midpoint-to-midpoint distance
+            legDistance = 0.4,        #wheel midpoint-to-midpoint distance
             platformHeight = 0.1,
             platformRadius = 0.22,
             platformMass = 5,
@@ -15,9 +15,9 @@ def RobotDog(SC, mbs,
             planarPlatform = True,
             dimGroundX = 8, dimGroundY = 8,
             gravity = [0,0,-9.81],
-            wheelRadius = 0.04,
-            wheelThickness = 0.01,
-            wheelMass = 0.05,
+            legRadius = 0.04,
+            legThickness = 0.01,
+            legMass = 0.05,
             pControl = 0,
             dControl = 0.02,
             usePenalty = True, #use penalty formulation in case useGeneralContact=False
@@ -83,9 +83,16 @@ def RobotDog(SC, mbs,
     # -------------------------------------------------
     # Inertias
     # -------------------------------------------------
-    rd.bodyInertia = InertiaCuboid(density, [L_body, W_body, H_body]).Translated([0,0,0])
-    rd.thighInertia = InertiaCuboid(density, [W_leg, W_leg, L_thigh]).Translated([0,0,0])#0.5*L_thigh])
-    rd.shinInertia  = InertiaCuboid(density, [W_leg, W_leg, L_shin]).Translated([0,0,0])#0.5*L_shin])
+    if platformInertia is None:
+        rd.platformInertia = InertiaCuboid(density, [L_body, W_body, H_body]).Translated([0,0,0])
+    else: 
+        rd.platformInertia = RigidBodyInertia(mass=platformMass, inertiaTensorAtCOM=np.diag(platformInertia))
+    if legInertia is None:
+        rd.thighInertia = InertiaCylinder(density, length=L_thigh, outerRadius=0.5 *W_leg, axis=2).Translated([0,0,0])
+        rd.shinInertia = InertiaCylinder(density, length=L_shin, outerRadius=0.5 *W_leg, axis=2).Translated([0,0,0])
+    else: 
+        rd.thighInertia = RigidBodyInertia(mass=legMass, inertiaTensorAtCOM=np.diag(legInertia))
+        rd.shinInertia  = RigidBodyInertia(mass=legMass, inertiaTensorAtCOM=np.diag(legInertia))
 
     # -------------------------------------------------
     # Node
@@ -189,9 +196,9 @@ def RobotDog(SC, mbs,
 
     # Plattform
     rd.jointOffsets.Append([0,0,0])
-    rd.linkInertiasCOM.Append(rd.bodyInertia.InertiaCOM())
-    rd.linkCOMs.Append(rd.bodyInertia.COM())
-    rd.linkMasses.append(rd.bodyInertia.Mass())
+    rd.linkInertiasCOM.Append(rd.platformInertia.InertiaCOM())
+    rd.linkCOMs.Append(rd.platformInertia.COM())
+    rd.linkMasses.append(rd.platformInertia.Mass())
     rd.gList.append(rd.gBody)
 
     # Hüften (4 Oberschenkelaufhängungen)
@@ -372,11 +379,11 @@ mbs = SC.AddSystem()
 
 useGeneralContact = False
 usePenalty = True
-wheelRadius = 0.04
-wheelDistance = 0.4
+legRadius = 0.04
+legDistance = 0.4
 rd = RobotDog(SC, mbs,useGeneralContact=useGeneralContact, 
                                 usePenalty=usePenalty, planarPlatform=True,
-                                wheelRadius=wheelRadius, wheelDistance=wheelDistance)
+                                legRadius=legRadius, legDistance=legDistance)
 mbs.Assemble()
 
 
