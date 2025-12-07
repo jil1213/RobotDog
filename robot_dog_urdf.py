@@ -16,7 +16,7 @@ mbs = SC.AddSystem()
 # URDF LADEN
 # ------------------------------------------------------------
 
-urdfBasePath = "a1_description/urdf/"     # folder
+urdfBasePath = "a1_documentation/urdf/"     # folder
 urdfFile     = "a1.urdf"                  # file inside this folder
 
 # URDF laden
@@ -100,3 +100,4 @@ exu.StartRenderer()
 mbs.SolveStatic()      # Hund einfach hängen lassen / Gravitation ausbalancieren
 SC.renderer.DoIdleTasks()
 exu.StopRenderer()
+
