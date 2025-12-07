@@ -11,7 +11,7 @@ def RobotDog(SC, mbs,
             W_body = 0.3,
             H_body = 0.2,
             platformMass = 5,
-            body_offset = 0.8  # Fallhöhe des Bodys über dem Boden
+            body_offset = 0.8,  # Fallhöhe des Bodys über dem Boden
             planarPlatform = True,
             dimGroundX = 8, dimGroundY = 8,
             gravity = [0,0,-9.81],
