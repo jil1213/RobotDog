@@ -377,7 +377,7 @@ SC.visualizationSettings.bodies.kinematicTree.frameSize = 0.15
 simSettings = exu.SimulationSettings()
 
 simSettings.timeIntegration.numberOfSteps = 4000   # 4000 Schritte
-simSettings.timeIntegration.endTime = 4            # 4 Sekunden
+simSettings.timeIntegration.endTime = 2           # 4 Sekunden
 simSettings.timeIntegration.generalizedAlpha.spectralRadius = 0.8
 simSettings.timeIntegration.verboseMode = 1        # Ausgabe an
 
