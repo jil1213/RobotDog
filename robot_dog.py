@@ -119,6 +119,7 @@ def RobotDog(SC, mbs,
     # -------------------------------------------------
     # KinematicTree
     # -------------------------------------------------
+    # 6 Gelenke der Plattform
     rd.jointTypes = [
         exu.JointType.PrismaticX,
         exu.JointType.PrismaticY,
@@ -135,7 +136,7 @@ def RobotDog(SC, mbs,
     rd.jointTypes += [exu.JointType.RevoluteY]*4
 
 
-    rd.linkParents = [-1, 0, 1,2,3,4, 5, 5, 5, 5, 6, 7, 8, 9] #    
+    rd.linkParents = [-1, 0, 1, 2, 3, 4, 5, 5, 5, 5, 6, 7, 8, 9] #    
 
     rd.platformIndex = 5
     print(len(rd.jointTypes))
@@ -174,15 +175,13 @@ def RobotDog(SC, mbs,
     for i in range(len(rd.jointTypes)):
         rd.jointTransformations.Append(np.eye(3))
 
-    # Joints 0 und 1
+    # Ersten 6 Gelenke sind Masselos 
     for i in range(5):
         rd.jointOffsets.Append([0,0,0])
         rd.linkInertiasCOM.Append(np.zeros((3,3)))
         rd.linkCOMs.Append([0,0,0])
         rd.linkMasses.append(0)
         rd.gList.append([])
-
-
 
     # Plattform
     rd.jointOffsets.Append([0,0,0])
@@ -273,10 +272,6 @@ def RobotDog(SC, mbs,
         forceUserFunction=UF_KinematicTreeForces,
         visualization=VObjectKinematicTree(graphicsDataList=rd.gList)
     ))
-
-
-
-
 
     rd.mLegs = []
 
