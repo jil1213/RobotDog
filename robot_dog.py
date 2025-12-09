@@ -376,10 +376,13 @@ SC.visualizationSettings.bodies.kinematicTree.frameSize = 0.15
 
 simSettings = exu.SimulationSettings()
 
-simSettings.timeIntegration.numberOfSteps = 4000   # 4000 Schritte
-simSettings.timeIntegration.endTime = 2           # 2 Sekunden (braucht er ca. zum Umfallen)
+simSettings.timeIntegration.numberOfSteps = 40000   # 200.000 Schritte (hängt von der Zeit ab)
+simSettings.timeIntegration.endTime = 4           # 4 Sekunden (braucht er ca. zum Umfallen)
 simSettings.timeIntegration.generalizedAlpha.spectralRadius = 0.8
 simSettings.timeIntegration.verboseMode = 1        # Ausgabe an
+simSettings.timeIntegration.discontinuous.useRecommendedStepSize = False
+
+simSettings.linearSolverType = exu.LinearSolverType.EigenSparse # 
 
 # Solver etwas stabiler machen
 simSettings.timeIntegration.newton.useModifiedNewton = True
@@ -393,7 +396,9 @@ simSettings.displayStatistics = True
 exu.StartRenderer()
 mbs.WaitForUserToContinue()
 #mbs.SolveDynamic(simSettings)
-mbs.SolveDynamic(simSettings)
+mbs.SolveDynamic(simSettings,
+                  # solverType=exu.DynamicSolverType.VelocityVerlet # Expliziter Solver
+                  ) 
 SC.renderer.DoIdleTasks()
 exu.StopRenderer()
 mbs.SolutionViewer()
