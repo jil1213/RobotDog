@@ -377,7 +377,7 @@ SC.visualizationSettings.bodies.kinematicTree.frameSize = 0.15
 simSettings = exu.SimulationSettings()
 
 simSettings.timeIntegration.numberOfSteps = 4000   # 4000 Schritte
-simSettings.timeIntegration.endTime = 2           # 4 Sekunden
+simSettings.timeIntegration.endTime = 2           # 2 Sekunden (braucht er ca. zum Umfallen)
 simSettings.timeIntegration.generalizedAlpha.spectralRadius = 0.8
 simSettings.timeIntegration.verboseMode = 1        # Ausgabe an
 
@@ -396,3 +396,12 @@ mbs.WaitForUserToContinue()
 mbs.SolveDynamic(simSettings)
 SC.renderer.DoIdleTasks()
 exu.StopRenderer()
+mbs.SolutionViewer()
+
+
+# Plot Sensors
+mbs.PlotSensor(sensorNumbers=[0],components=[0],closeAll=True) # Bewegung Plattform in x-Richtung
+mbs.PlotSensor(sensorNumbers=[1],components=[0],closeAll=False) # Geschwingkeit Plattform in x-Richtung
+mbs.PlotSensor(sensorNumbers=[2],components=[0],closeAll=False) # Winkel Plattform
+mbs.PlotSensor(sensorNumbers=[3],components=[0],closeAll=False) # Winkelgeschwingkeit Plattform
+
