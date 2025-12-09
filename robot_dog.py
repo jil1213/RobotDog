@@ -402,6 +402,6 @@ mbs.SolutionViewer()
 # Plot Sensors
 mbs.PlotSensor(sensorNumbers=[0],components=[0],closeAll=True) # Bewegung Plattform in x-Richtung
 mbs.PlotSensor(sensorNumbers=[1],components=[0],closeAll=False) # Geschwingkeit Plattform in x-Richtung
-mbs.PlotSensor(sensorNumbers=[2],components=[0],closeAll=False) # Winkel Plattform
-mbs.PlotSensor(sensorNumbers=[3],components=[0],closeAll=False) # Winkelgeschwingkeit Plattform
+mbs.PlotSensor(sensorNumbers=[2],components=[2],closeAll=False) # Winkel Plattform
+mbs.PlotSensor(sensorNumbers=[3],components=[2],closeAll=False) # Winkelgeschwingkeit Plattform
 
