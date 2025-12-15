@@ -245,11 +245,11 @@ def RobotDog(SC, mbs,
         rd.jointOffsets.Append(pos)
         rd.linkInertiasCOM.Append(rd.thighInertia.InertiaCOM())
         rd.linkCOMs.Append(rd.thighInertia.COM())
-        rd.linkMasses.append(rd.thighInertia.Mass())
+        rd.linkMasses.append(0)
         rd.gList.append(rd.gZero)
-        
+
     # Oberschenkel Y-Achse
-        
+
     rd.hipPositions = np.zeros((4,3))
 
     for pos in rd.hipPositions:
@@ -327,10 +327,10 @@ def RobotDog(SC, mbs,
 
     rd.mLegs = []
 
-    # # KNIE GELENK
+    # KNIE GELENK
     # for i in range(4):
     #     rd.mLeg = mbs.AddMarker(MarkerKinematicTreeRigid(objectNumber=rd.oKT,
-    #                                                 linkNumber=rd.platformIndex+1+i,
+    #                                                 linkNumber=14+i, # 14 = erster Shin Link
     #                                                 localPosition=[0,0, -L_thigh]))
     #     rd.mLegs.append(rd.mLeg)
     #     rd.gContact.AddSphereWithMarker(rd.mLeg,
