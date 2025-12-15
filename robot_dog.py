@@ -4,7 +4,7 @@ import exudyn.graphics as graphics
 import numpy as np
 from exudyn.robotics.motion import Trajectory, ProfileConstantAcceleration, ProfilePTP
 
-def RobotDog(SC, mbs,  
+def RobotDog(
             platformInertia = None,
             legInertia = None,
             referenceCoordinates = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0,0,0,0],
@@ -31,7 +31,10 @@ def RobotDog(SC, mbs,
     #add class which can be returned to enable user to access parameters
     class rd: pass
 
+    SC = exu.SystemContainer()
+    mbs = SC.AddSystem()
 
+    g = [0,0,-9.81]
     # -------------------------------------------------
     # Boden
     # -------------------------------------------------
@@ -261,8 +264,6 @@ def RobotDog(SC, mbs,
         rd.gList.append(rd.gThigh)
 
 
- 
-
     # Kniegelenk sitzt am Ende des Oberschenkels
     for i in range(4):
         rd.jointOffsets.Append([0,0,-L_thigh])  # Knie am Beinende
@@ -270,42 +271,6 @@ def RobotDog(SC, mbs,
         rd.linkCOMs.Append(rd.shinInertia.COM())
         rd.linkMasses.append(rd.shinInertia.Mass())
         rd.gList.append(rd.gShin)
-
-
-
-
-
-    # def UF_KinematicTreeForces(mbs, t, itemIndex, q, q_t):
-    #     # q = alle Gelenkkoordinaten
-    #     # q_t = Gelenkgeschwindigkeiten
-
-    #     # ---- JOINT LIMITS ----
-    #     deg = np.pi/180
-    #     limitK = 2000
-
-    #     jointLimits = {
-    #         6: (-90*deg,  90*deg),   # Hüften
-    #         7: (-90*deg,  90*deg),
-    #         8: (-90*deg,  90*deg),
-    #         9: (-90*deg,  90*deg),
-
-    #         10: (-90*deg, -10*deg),   # Knie
-    #         11: (-90*deg, -10*deg),
-    #         12: (-90*deg, -10*deg),
-    #         13: (-90*deg, -10*deg),
-    #     }
-
-    #     # Ausgang: Nullkräfte
-    #     jointForces = [0]*len(q)
-
-    #     # Gelenkgrenzen prüfen
-    #     for j, (qmin, qmax) in jointLimits.items():
-    #         if q[j] < qmin:
-    #             jointForces[j] = limitK*(qmin - q[j])
-    #         elif q[j] > qmax:
-    #             jointForces[j] = limitK*(qmax - q[j])
-
-    #     return jointForces
 
 
     # -------------------------------------------------
@@ -335,18 +300,7 @@ def RobotDog(SC, mbs,
 
     rd.mLegs = []
 
-    # KNIE GELENK
-    # for i in range(4):
-    #     rd.mLeg = mbs.AddMarker(MarkerKinematicTreeRigid(objectNumber=rd.oKT,
-    #                                                 linkNumber=14+i, # 14 = erster Shin Link
-    #                                                 localPosition=[0,0, -L_thigh]))
-    #     rd.mLegs.append(rd.mLeg)
-    #     rd.gContact.AddSphereWithMarker(rd.mLeg,
-    #                                 radius=0.5*W_leg,
-    #                                 contactStiffness=1e5,
-    #                                 contactDamping=1e3,
-    #                                 frictionMaterialIndex=0)
-        
+
     # FÜSSE (Ende des Unterschenkels)
     for i in range(4):
         rd.mLeg = mbs.AddMarker(MarkerKinematicTreeRigid(objectNumber=rd.oKT,
@@ -360,44 +314,9 @@ def RobotDog(SC, mbs,
                                     frictionMaterialIndex=0)
 
 
-
-    # # #BODY Points on the Edges of The BODY
-    # sph_rad=0.1
-    # offsets = [
-    #     [ L_body/2 - sph_rad,  W_body/2 - sph_rad, -H_body/2 + sph_rad],   # vorne rechts unten
-    #     [ L_body/2 - sph_rad, -W_body/2 + sph_rad, -H_body/2 + sph_rad],   # vorne links unten
-    #     [-L_body/2 + sph_rad,  W_body/2 - sph_rad, -H_body/2 + sph_rad],   # hinten rechts unten
-    #     [-L_body/2 + sph_rad, -W_body/2 + sph_rad, -H_body/2 + sph_rad],   # hinten links unten
-
-    #     # [ L_body/2 - sph_rad,  W_body/2 - sph_rad,  H_body/2 - sph_rad],   # vorne rechts oben
-    #     # [ L_body/2 - sph_rad, -W_body/2 + sph_rad,  H_body/2 - sph_rad],   # vorne links oben
-    #     # [-L_body/2 + sph_rad,  W_body/2 - sph_rad,  H_body/2 - sph_rad],   # hinten rechts oben
-    #     # [-L_body/2 + sph_rad, -W_body/2 + sph_rad,  H_body/2 - sph_rad],   # hinten links oben
-    # ]
-
-    # rd.markers = []
-
-    # for pos in offsets:
-    #     m = mbs.AddMarker(
-    #         MarkerKinematicTreeRigid(
-    #             objectNumber=rd.oKT,
-    #             linkNumber=rd.platformIndex,
-    #             localPosition=pos
-    #         )
-    #     )
-    #     rd.markers.append(m)
-
-    #     rd.gContact.AddSphereWithMarker(
-    #         markerIndex=m,
-    #         radius=sph_rad,
-    #         contactStiffness=1e5,
-    #         contactDamping=1e3,
-    #         frictionMaterialIndex=0
-    #     )
-
-
-
-
+    # -------------------------------------------------
+    # Add Sensors
+    # -------------------------------------------------
     sPlatformPos = mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex,
                                                             storeInternal=True, outputVariableType=exu.OutputVariableType.Position))
     sPlatformVel = mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex,
@@ -407,18 +326,19 @@ def RobotDog(SC, mbs,
     sPlatformAngVel = mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex,
                                                             storeInternal=True, outputVariableType=exu.OutputVariableType.AngularVelocity))
 
-
     for i in range(8):
         mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex+1+i,
                                                                 storeInternal=True, outputVariableType=exu.OutputVariableType.Rotation))
         mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex+1+i,
-                                                                storeInternal=True, outputVariableType=exu.OutputVariableType.AngularVelocity))    
+                                                                storeInternal=True, outputVariableType=exu.OutputVariableType.AngularVelocity))
 
 
+    # -------------------------------------------------
+    # configurations and trajectory
+    # -------------------------------------------------
 
     q0 = [0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     q1 = [0, 0, 0.8, 0, 0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    #q1 = [0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0.3, 0.3, 0.3, 0.3, -0.8, -0.8, -0.8, -0.8]
     q2 = [0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     rd.trajectory = Trajectory(initialCoordinates=q0, initialTime=0)
     rd.trajectory.Add(ProfileConstantAcceleration(q1, 1.0))
@@ -439,10 +359,10 @@ def RobotDog(SC, mbs,
     # # # q1 = [0,0,0, 0,0,0, 0,0.1*pi,-0.1*pi, 0,0,0, 0,0,0, 0,0,0]
     # # # q1 = [0,0,0, 0,0,0, 0,0,0, 0,0.1*pi,-0.1*pi, 0,0,0, 0,0,0]
     # # q1 = [0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0.1*pi,-0.1*pi, 0,0,0]
-    # q1 = [0,0,0, 0,0,0, 0.25*pi,0,0,-0.25*pi,0,0,0.25*pi,0,0,-0.25*pi,0,0,]
-    # q2 = [0,0,0, 0,0,0, 0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi] # [[0]*6, hip_y, hip_x, knee_x, ....]
-    # q3 = [0,0,0, 0,0,0, 0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi] # [[0]*6, hip_y, hip_x, knee_x, ....]
-    # q4 = [0,0,0,0,0,0,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0,0,0,0,0]
+    q1 = [0,0,0, 0,0,0, 0.25*pi,0,0,-0.25*pi,0,0,0.25*pi,0,0,-0.25*pi,0,0,]
+    q2 = [0,0,0, 0,0,0, 0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi] # [[0]*6, hip_y, hip_x, knee_x, ....]
+    q3 = [0,0,0, 0,0,0, 0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi] # [[0]*6, hip_y, hip_x, knee_x, ....]
+    q4 = [0,0,0,0,0,0,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0,0,0,0,0]
 
     # q1 = [0,0,0,0,0,0,0,0.4*pi,-0.5*pi,0,0,0,0,0,0,0,0,0] # [[0]*6, hip_y, hip_x, knee_x, ....]
     # q2 = q0
@@ -457,7 +377,11 @@ def RobotDog(SC, mbs,
     rd.trajectory.Add(ProfileConstantAcceleration(q4,0.7))
     rd.trajectory.Add(ProfileConstantAcceleration(q0,0.4))
 
-    return rd
+    mbs.Assemble()
+    mbs.variables['rd'] = rd
+    mbs.variables['trajectory'] = rd.trajectory
+
+    return mbs, SC, rd.oKT, rd.nKT
 
 
 
@@ -472,65 +396,61 @@ def PreStepUF(mbs, t):
 
     return True
 
+if __name__ == "__main__":
 
-# -------------------------------------------------
-# Render only Model to check 
-# -------------------------------------------------
-SC = exu.SystemContainer()
-mbs = SC.AddSystem()
+    # -------------------------------------------------
+    # Render only Model to check 
+    # -------------------------------------------------
 
-useGeneralContact = False
-usePenalty = True
-rd = RobotDog(SC, mbs,useGeneralContact=useGeneralContact, 
-                                usePenalty=usePenalty)
+    mbs, SC, oKT, nKT, = RobotDog()
 
-mbs.variables['rd'] = rd
-mbs.variables['trajectory'] = rd.trajectory
+    # mbs.variables['rd'] = rd
+    # mbs.variables['trajectory'] = rd.trajectory
 
-mbs.Assemble()
+    mbs.Assemble()
 
-mbs.SetPreStepUserFunction(PreStepUF)
+    mbs.SetPreStepUserFunction(PreStepUF)
 
-SC.visualizationSettings.general.drawWorldBasis = True
-SC.visualizationSettings.bodies.kinematicTree.showJointFrames = True
-SC.visualizationSettings.bodies.kinematicTree.frameSize = 0.15
-SC.visualizationSettings.contact.showSpheres = True
+    SC.visualizationSettings.general.drawWorldBasis = True
+    SC.visualizationSettings.bodies.kinematicTree.showJointFrames = True
+    SC.visualizationSettings.bodies.kinematicTree.frameSize = 0.15
+    SC.visualizationSettings.contact.showSpheres = True
 
 
-simSettings = exu.SimulationSettings()
+    simSettings = exu.SimulationSettings()
 
-simSettings.timeIntegration.numberOfSteps = 40000   # 200.000 Schritte (hängt von der Zeit ab)
-simSettings.timeIntegration.endTime = 4           # 4 Sekunden (braucht er ca. zum Umfallen)
-simSettings.timeIntegration.generalizedAlpha.spectralRadius = 0.8
-simSettings.timeIntegration.verboseMode = 1        # Ausgabe an
-simSettings.timeIntegration.discontinuous.useRecommendedStepSize = False
+    simSettings.timeIntegration.numberOfSteps = 40000   # 200.000 Schritte (hängt von der Zeit ab)
+    simSettings.timeIntegration.endTime = 4           # 4 Sekunden (braucht er ca. zum Umfallen)
+    simSettings.timeIntegration.generalizedAlpha.spectralRadius = 0.8
+    simSettings.timeIntegration.verboseMode = 1        # Ausgabe an
+    simSettings.timeIntegration.discontinuous.useRecommendedStepSize = False
 
-simSettings.linearSolverType = exu.LinearSolverType.EigenSparse # 
+    simSettings.linearSolverType = exu.LinearSolverType.EigenSparse # 
 
-# Solver etwas stabiler machen
-simSettings.timeIntegration.newton.useModifiedNewton = True
-simSettings.displayStatistics = True
+    # Solver etwas stabiler machen
+    simSettings.timeIntegration.newton.useModifiedNewton = True
+    simSettings.displayStatistics = True
 
-# -------------------------------------------------
-# Start simulation
-# -------------------------------------------------
-#mbs.SolveDynamic(simSettings)
+    # -------------------------------------------------
+    # Start simulation
+    # -------------------------------------------------
+    #mbs.SolveDynamic(simSettings)
 
-exu.StartRenderer()
-mbs.WaitForUserToContinue()
-#mbs.SolveDynamic(simSettings)
-#mbs.SolveDynamic(simSettings)
+    exu.StartRenderer()
+    mbs.WaitForUserToContinue()
+    #mbs.SolveDynamic(simSettings)
+    #mbs.SolveDynamic(simSettings)
 
-mbs.SolveDynamic(simSettings,
-                  solverType=exu.DynamicSolverType.VelocityVerlet # Expliziter Solver
-                  ) 
-SC.renderer.DoIdleTasks()
-exu.StopRenderer()
-mbs.SolutionViewer()
+    mbs.SolveDynamic(simSettings,
+                    solverType=exu.DynamicSolverType.VelocityVerlet # Expliziter Solver
+                    ) 
+    SC.renderer.DoIdleTasks()
+    exu.StopRenderer()
+    mbs.SolutionViewer()
 
 
-# Plot Sensors
-mbs.PlotSensor(sensorNumbers=[0],components=[0],closeAll=True) # Bewegung Plattform in x-Richtung
-mbs.PlotSensor(sensorNumbers=[1],components=[0],closeAll=False) # Geschwingkeit Plattform in x-Richtung
-mbs.PlotSensor(sensorNumbers=[2],components=[2],closeAll=False) # Winkel Plattform
-mbs.PlotSensor(sensorNumbers=[3],components=[2],closeAll=False) # Winkelgeschwingkeit Plattform
+    # Plot Sensors
+    mbs.PlotSensor(sensorNumbers=[0],components=[0],closeAll=True) # Bewegung Plattform in x-Richtung
+    mbs.PlotSensor(sensorNumbers=[1],components=[0],closeAll=False) # Geschwingkeit Plattform in x-Richtung
+    mbs.PlotSensor(sensorNumbers=[2],components=[2],closeAll=False) # Winkel Plattform
+    mbs.PlotSensor(sensorNumbers=[3],components=[2],closeAll=False) # Winkelgeschwingkeit Plattform
