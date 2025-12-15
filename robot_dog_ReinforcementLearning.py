@@ -1,18 +1,4 @@
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# This is an EXUDYN example
-#
-# Details:  This file shows reinfocement learning for spotModel.py (has to be in same folder)
-#
-# Author:   Johannes Gerstmayr, Janik Thentie
-# 
-# Date:      2025-03-10
-#
-# Notes:     requires pip install stable-baselines3[extra]
-# 
-# Copyright:This file is part of Exudyn. Exudyn is free software. You can redistribute it and/or modify it under the terms of the Exudyn license. See 'LICENSE.txt' for more details.
-#
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
+# template by spotModel.py but changed for own model RobotDog
 
 import sys
 import os
@@ -35,9 +21,9 @@ from stable_baselines3 import PPO, A2C, SAC
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.callbacks import BaseCallback
 import numpy as np
-import gym
+import gymnasium as gym
 
-import RL_Spot
+from robot_dog import RobotDog
 
 dtypeNumpy = np.float64
 
@@ -128,14 +114,12 @@ class RewardLoggingCallback(BaseCallback):
 
 
 #%%#########################
-addShoulderContact = False
 
-class SpotEnv(OpenAIGymInterfaceEnv): 
+class DogEnv(OpenAIGymInterfaceEnv): 
     # def __init__(self):
         
         
     def CreateMBS(self, SC, mbs, simulationSettings, **kwargs):
-        global addShoulderContact
         #%%++++++++++++++++++++++++++++++++++++++++++++++             
         self.doPlanar = False
         self.useLegContactState = True
@@ -149,7 +133,7 @@ class SpotEnv(OpenAIGymInterfaceEnv):
         #%%++++++++++++++++++++++++
         self.cntCalls = 0
         
-        self.mbs, self.SC, self.oKT, self.nKT = RL_Spot.GetModel(addShoulderContact=addShoulderContact)
+        self.mbs, self.SC, self.oKT, self.nKT = RobotDog()
         self.legsInit = self.mbs.variables['legsInit']
         self.legMarkers = self.mbs.variables['legMarkers']
         self.legRadius = self.mbs.variables['legRadius']
@@ -416,7 +400,7 @@ class SpotEnv(OpenAIGymInterfaceEnv):
         return np.array(self.state, dtype=dtypeNumpy), reward, terminated, truncated, info
         
 
-    def getReward(self):
+    def getReward(self): # todo: We have to change this for robot dog
         # Berechne eine Belohnung basierend auf dem Zustand und der Aktion
         reward = 0
         pos = self.state[:2]
@@ -477,13 +461,13 @@ class SpotEnv(OpenAIGymInterfaceEnv):
 #%%+++++++++++++++++++++++++++++++++++++++++++++
 if __name__ == '__main__': #this is only executed when file is direct called in Python
     import time
-        
+    False
     #%%++++++++++++++++++++++++++++++++++++++++++++++++++
     #use some learning algorithm:
     #pip install stable_baselines3
     from stable_baselines3 import A2C, SAC    
     
-    modelName = 'Spot_RL'
+    modelName = 'RobotDog_RL'
     
     tensorboard_log = None #no logging
     rewardCallback = None
@@ -493,7 +477,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
     import torch #stable-baselines3 is based on pytorch
     torch.set_num_threads(1) #1 seems to be ideal
     n_cores= os.cpu_count() #n_cores should be number of threads!
-    n_cores = 20
+    n_cores = 1# 20
     doParallel = True
 
     if hasTensorboard: #only us if tensorboard is available
@@ -541,7 +525,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
     if True: #train
         
         if False:
-            env = SpotEnv()
+            env = DogEnv()
             env.TestModel(numberOfSteps=2000, seed=42, sleepTime=0.0, useRenderer=True)
             sys.exit()
     
@@ -553,7 +537,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
         if modelType == 'A2C': log_interval = 100
         
         if not doParallel:
-            env = SpotEnv()
+            env = DogEnv()
             showDuringLearning = True
             #torch.set_num_threads(1) #seems to be best for serial
     
@@ -578,7 +562,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
             print('Train in parallel, using',n_cores,'cores')
     
             from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
-            vecEnv = SubprocVecEnv([SpotEnv for i in range(n_cores)])
+            vecEnv = SubprocVecEnv([DogEnv for i in range(n_cores)])
             
         
             model = getModel(vecEnv,modelType=modelType)
@@ -604,12 +588,11 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
         #%%++++++++++++++++++++++++++++++++++++++++++++++++++
         #only load and test
         if True: 
-            model = SAC.load("solution/tensorboard_log/Spot_RL_best")
-            #model = SAC.load("solution/tensorboard_log/Spot_RL_best_temp")
+            model = SAC.load("solution/tensorboard_log/RobotDog_RL_best")
+            #model = SAC.load("solution/tensorboard_log/RobotDog_RL_best_temp")
             #model = SAC.load("solution/" + modelName)
-        
-        addShoulderContact = True
-        env = SpotEnv() #larger threshold for testing
+
+        env = DogEnv() #larger threshold for testing
         solutionFile='solution/learningCoordinates.txt'
         env.testModel = True
         env.TestModel(numberOfSteps=250, model=model, solutionFileName=solutionFile, 
