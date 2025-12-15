@@ -243,8 +243,8 @@ def RobotDog(SC, mbs,
     # Oberschenkel X-Achse
     for pos in rd.hipPositions:
         rd.jointOffsets.Append(pos)
-        rd.linkInertiasCOM.Append(rd.thighInertia.InertiaCOM())
-        rd.linkCOMs.Append(rd.thighInertia.COM())
+        rd.linkInertiasCOM.Append(np.zeros((3,3)))
+        rd.linkCOMs.Append([0,0,0])
         rd.linkMasses.append(0)
         rd.gList.append(rd.gZero)
 
