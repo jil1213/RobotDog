@@ -35,7 +35,7 @@ def RobotDog(SC, mbs,
     # Boden
     # -------------------------------------------------
 
-    k = 10e4*0.5
+    k = 10
     d = 0.01*k
     frictionCoeff = 0.8 #0.5
     ss = 1
@@ -143,8 +143,11 @@ def RobotDog(SC, mbs,
         exu.JointType.RevoluteZ,
     ]
 
-    # 4 Hüftgelenke
-    rd.jointTypes += [exu.JointType.RevoluteX, exu.JointType.RevoluteY]*4
+    # 4 Hüftgelenke X-Achse
+    rd.jointTypes += [exu.JointType.RevoluteX]*4
+    
+    # 4 Hüftgelenke Y-Achse
+    rd.jointTypes += [exu.JointType.RevoluteY]*4
 
     # 4 Kniegelenke
     rd.jointTypes += [exu.JointType.RevoluteY]*4
@@ -155,18 +158,18 @@ def RobotDog(SC, mbs,
     rd.linkParents = [
         -1, 0, 1, 2, 3, 4,   # 0–5 Floating base
 
-        5,   # 6  HipX FL
-        6,   # 7  HipY FL
-        5,   # 8  HipX FR
-        8,   # 9  HipY FR
-        5,   # 10 HipX BL
-        10,  # 11 HipY BL
-        5,   # 12 HipX BR
-        12,  # 13 HipY BR
+        5,   # 6  HipX FR
+        5,   # 7  HipX BR
+        5,   # 8  HipX FL
+        5,   # 9  HipX BL
+        6,   # 10 HipY FR
+        7,   # 11 HipY BR
+        8,   # 12 HipY FL
+        9,   # 13 HipY BL
 
-        7,   # 14 Knee FL
-        9,   # 15 Knee FR
-        11,  # 16 Knee BL
+        10,   # 14 Knee FL
+        11,   # 15 Knee FR
+        12,  # 16 Knee BL
         13   # 17 Knee BR
     ]
 
@@ -193,6 +196,8 @@ def RobotDog(SC, mbs,
         graphics.Cylinder([0,0,0], [0,0,-L_shin], W_leg*0.4, color=graphics.color.green),
         graphics.Basis(length=0.1)
     ]
+    
+    rd.gZero =[]
 
     # -------------------------------------------------
     # JointOffsets, Massen, COMs
@@ -235,7 +240,18 @@ def RobotDog(SC, mbs,
         [ hipX, -hipY, hipZ]
     ]
 
-    # Oberschenkel
+    # Oberschenkel X-Achse
+    for pos in rd.hipPositions:
+        rd.jointOffsets.Append(pos)
+        rd.linkInertiasCOM.Append(rd.thighInertia.InertiaCOM())
+        rd.linkCOMs.Append(rd.thighInertia.COM())
+        rd.linkMasses.append(rd.thighInertia.Mass())
+        rd.gList.append(rd.gZero)
+        
+    # Oberschenkel Y-Achse
+        
+    rd.hipPositions = np.zeros((4,3))
+
     for pos in rd.hipPositions:
         rd.jointOffsets.Append(pos)
         rd.linkInertiasCOM.Append(rd.thighInertia.InertiaCOM())
@@ -243,15 +259,8 @@ def RobotDog(SC, mbs,
         rd.linkMasses.append(rd.thighInertia.Mass())
         rd.gList.append(rd.gThigh)
 
-    for pos in rd.hipPositions:
-        rd.jointOffsets.Append(pos)
-        rd.linkInertiasCOM.Append(rd.thighInertia.InertiaCOM())
-        rd.linkCOMs.Append(rd.thighInertia.COM())
-        rd.linkMasses.append(rd.thighInertia.Mass())
-        rd.gList.append(rd.gThigh)
 
-
-
+ 
 
     # Kniegelenk sitzt am Ende des Oberschenkels
     for i in range(4):
