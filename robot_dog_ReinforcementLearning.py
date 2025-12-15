@@ -220,7 +220,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
         #+++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         
-    def MapAction2MBS(self, action):   
+    def MapAction2MBS(self, action):   # todo: not sure if we use the same order: HipX_FL, HipX_FR, HipX_BL, HipX_BR???
         modAction = np.array(action)
         
         if self.doPlanar:
@@ -340,7 +340,8 @@ class DogEnv(OpenAIGymInterfaceEnv):
         
         #reset incremental set values
         self.previousSetCoordinates = np.zeros(self.nActuatedJoints)
-        self.previousSetCoordinates += np.array(self.legsInit*4)
+        #self.previousSetCoordinates += np.array(self.legsInit*4) #this was used for spot
+        self.previousSetCoordinates = np.array(self.legsInit, dtype=dtypeNumpy)
         self.state[:self.nActuatedJoints] += self.previousSetCoordinates
         
         self.initialPosition = self.state[0:2]
