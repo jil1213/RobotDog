@@ -35,7 +35,7 @@ def RobotDog(SC, mbs,
     # Boden
     # -------------------------------------------------
 
-    k = 10e4*0.5
+    k = 10
     d = 0.01*k
     frictionCoeff = 0.8 #0.5
     ss = 1
@@ -246,7 +246,7 @@ def RobotDog(SC, mbs,
         rd.linkInertiasCOM.Append(rd.thighInertia.InertiaCOM())
         rd.linkCOMs.Append(rd.thighInertia.COM())
         rd.linkMasses.append(rd.thighInertia.Mass())
-        rd.gList.append(rd.gThigh)
+        rd.gList.append(rd.gZero)
         
     # Oberschenkel Y-Achse
         
@@ -257,10 +257,10 @@ def RobotDog(SC, mbs,
         rd.linkInertiasCOM.Append(rd.thighInertia.InertiaCOM())
         rd.linkCOMs.Append(rd.thighInertia.COM())
         rd.linkMasses.append(rd.thighInertia.Mass())
-        rd.gList.append(rd.gZero)
+        rd.gList.append(rd.gThigh)
 
 
-
+ 
 
     # Kniegelenk sitzt am Ende des Oberschenkels
     for i in range(4):
