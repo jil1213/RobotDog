@@ -3,7 +3,7 @@ from exudyn.utilities import *
 import exudyn.graphics as graphics
 import numpy as np
 
-def RobotDog(SC, mbs, 
+def RobotDog(SC, mbs,  
             platformInertia = None,
             legInertia = None,
             referenceCoordinates = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
