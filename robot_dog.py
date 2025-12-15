@@ -6,7 +6,7 @@ import numpy as np
 def RobotDog(SC, mbs, 
             platformInertia = None,
             legInertia = None,
-            referenceCoordinates = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            referenceCoordinates = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0,0,0,0],
             L_body = 1.0,   #Länge Body
             W_body = 0.3,
             H_body = 0.2,
@@ -23,7 +23,7 @@ def RobotDog(SC, mbs,
             dControl = 0.02,
             usePenalty = True, #use penalty formulation in case useGeneralContact=False
             frictionProportionalZone = 0.01, # own parameter other example has 0.025
-            frictionCoeff = 1, stiffnessGround = 1e5,
+            frictionCoeff = 0.8, stiffnessGround = 1e5,
             gContact = None, 
             useGeneralContact = False #generalcontact shows large errors currently
             ):
@@ -34,7 +34,21 @@ def RobotDog(SC, mbs,
     # -------------------------------------------------
     # Boden
     # -------------------------------------------------
-    rd.gGround = graphics.CheckerBoard(normal=[0,0,1], size=dimGroundX, size2=dimGroundY, nTiles=8, zOffset=-1e-5)
+
+    k = 10e4*0.5
+    d = 0.01*k
+    frictionCoeff = 0.8 #0.5
+    ss = 1
+
+    planeL = 16
+
+    zContact = -0.7+0.01214+6.45586829e-02 #contact at beginning, leg = [0,0.2*pi,-0.3*pi]
+    p0 = [0,0,0]
+    mbs.variables['zContact'] = zContact
+
+    rd.gGroundSimple = graphics.CheckerBoard(p0,size=planeL, nTiles=1) #only 1 tile for efficiency
+
+    rd.gGround = graphics.CheckerBoard(p0,size=planeL, nTiles=16)
     rd.oGround = mbs.AddObject(ObjectGround(referencePosition=[0,0,0],
                                         visualization=VObjectGround(graphicsData=[rd.gGround])))
 
@@ -49,25 +63,25 @@ def RobotDog(SC, mbs,
     frictionIndexFree = 1
 
     rd.gContact = mbs.AddGeneralContact()
-    rd.gContact.frictionProportionalZone = frictionProportionalZone
+    rd.gContact.frictionProportionalZone = 0.01
 
-    rd.gContact.SetFrictionPairings(np.diag([rd.frictionCoeff, 0.0]))  # Material 0 hat Reibung, 1 nicht
-
+    rd.gContact.SetFrictionPairings(frictionCoeff*np.eye(1))
+    rd.gContact.SetSearchTreeCellSize(numberOfCells=[ss,ss,1])
     # WICHTIG: Suchbaum-Box manuell setzen (verhindert "size must not be zero")
-    rd.gContact.SetSearchTreeBox(
-        pMin=[-10,-10,-1],
-        pMax=[ 10, 10, 1]
-    )
+    stFact = 0.3
+    rd.gContact.SetSearchTreeBox(pMin=np.array([-0.5*planeL*stFact,-0.5*planeL*stFact,-1]),
+                               pMax=np.array([0.5*planeL*stFact,0.5*planeL*stFact,0.1]))
 
-    [meshPoints, meshTrigs] = graphics.ToPointsAndTrigs(rd.gGround)
+    [meshPoints, meshTrigs] = graphics.ToPointsAndTrigs(rd.gGroundSimple)
 
     rd.gContact.AddTrianglesRigidBodyBased(
         rigidBodyMarkerIndex = rd.mGround,
-        contactStiffness = frictionProportionalZone,
-        contactDamping = rd.dampingGround,
-        frictionMaterialIndex = frictionIndexGround,
+        contactStiffness = k,
+        contactDamping = d,
+        frictionMaterialIndex = 0,
         pointList = meshPoints,
-        triangleList = meshTrigs
+        triangleList = meshTrigs,
+        staticTriangles=False,
     )
     ### End eKontakt mit dem Boden ------
 
@@ -89,7 +103,7 @@ def RobotDog(SC, mbs,
     # Node
     # -------------------------------------------------
     # 3 Plattform XYZ-Translation + 3 Plattform Drehung + 4 Hüfte + 4 Knie = 14 DOF
-    rd.nJoints = 3 + 3 + 4 + 4 
+    rd.nJoints = 3 + 3 + 4 + 4 + 4
     # referenceCoordinates = [0]*rd.nJoints
     deg=math.pi/180
 
@@ -106,7 +120,7 @@ def RobotDog(SC, mbs,
     # ]
     initialAngles = [
         0,0,body_offset,0,0,0,
-    0,0,0,0,-0.1,-0.1,-0.1,-0.1
+    0,0,0,0,0,0,0,0,-0.1,-0.1,-0.1,-0.1
     ]
 
 
@@ -130,13 +144,32 @@ def RobotDog(SC, mbs,
     ]
 
     # 4 Hüftgelenke
-    rd.jointTypes += [exu.JointType.RevoluteY]*4
+    rd.jointTypes += [exu.JointType.RevoluteX, exu.JointType.RevoluteY]*4
 
     # 4 Kniegelenke
     rd.jointTypes += [exu.JointType.RevoluteY]*4
 
 
-    rd.linkParents = [-1, 0, 1, 2, 3, 4, 5, 5, 5, 5, 6, 7, 8, 9] #    
+    #rd.linkParents = [-1, 0, 1, 2, 3, 4, 5, 5, 5, 5,5,5,5,5, 6, 7, 8, 9] #    
+
+    rd.linkParents = [
+        -1, 0, 1, 2, 3, 4,   # 0–5 Floating base
+
+        5,   # 6  HipX FL
+        6,   # 7  HipY FL
+        5,   # 8  HipX FR
+        8,   # 9  HipY FR
+        5,   # 10 HipX BL
+        10,  # 11 HipY BL
+        5,   # 12 HipX BR
+        12,  # 13 HipY BR
+
+        7,   # 14 Knee FL
+        9,   # 15 Knee FR
+        11,  # 16 Knee BL
+        13   # 17 Knee BR
+    ]
+
 
     rd.platformIndex = 5
     print(len(rd.jointTypes))
@@ -210,6 +243,16 @@ def RobotDog(SC, mbs,
         rd.linkMasses.append(rd.thighInertia.Mass())
         rd.gList.append(rd.gThigh)
 
+    for pos in rd.hipPositions:
+        rd.jointOffsets.Append(pos)
+        rd.linkInertiasCOM.Append(rd.thighInertia.InertiaCOM())
+        rd.linkCOMs.Append(rd.thighInertia.COM())
+        rd.linkMasses.append(rd.thighInertia.Mass())
+        rd.gList.append(rd.gThigh)
+
+
+
+
     # Kniegelenk sitzt am Ende des Oberschenkels
     for i in range(4):
         rd.jointOffsets.Append([0,0,-L_thigh])  # Knie am Beinende
@@ -222,37 +265,37 @@ def RobotDog(SC, mbs,
 
 
 
-    def UF_KinematicTreeForces(mbs, t, itemIndex, q, q_t):
-        # q = alle Gelenkkoordinaten
-        # q_t = Gelenkgeschwindigkeiten
+    # def UF_KinematicTreeForces(mbs, t, itemIndex, q, q_t):
+    #     # q = alle Gelenkkoordinaten
+    #     # q_t = Gelenkgeschwindigkeiten
 
-        # ---- JOINT LIMITS ----
-        deg = np.pi/180
-        limitK = 2000
+    #     # ---- JOINT LIMITS ----
+    #     deg = np.pi/180
+    #     limitK = 2000
 
-        jointLimits = {
-            6: (-90*deg,  90*deg),   # Hüften
-            7: (-90*deg,  90*deg),
-            8: (-90*deg,  90*deg),
-            9: (-90*deg,  90*deg),
+    #     jointLimits = {
+    #         6: (-90*deg,  90*deg),   # Hüften
+    #         7: (-90*deg,  90*deg),
+    #         8: (-90*deg,  90*deg),
+    #         9: (-90*deg,  90*deg),
 
-            10: (-90*deg, -10*deg),   # Knie
-            11: (-90*deg, -10*deg),
-            12: (-90*deg, -10*deg),
-            13: (-90*deg, -10*deg),
-        }
+    #         10: (-90*deg, -10*deg),   # Knie
+    #         11: (-90*deg, -10*deg),
+    #         12: (-90*deg, -10*deg),
+    #         13: (-90*deg, -10*deg),
+    #     }
 
-        # Ausgang: Nullkräfte
-        jointForces = [0]*len(q)
+    #     # Ausgang: Nullkräfte
+    #     jointForces = [0]*len(q)
 
-        # Gelenkgrenzen prüfen
-        for j, (qmin, qmax) in jointLimits.items():
-            if q[j] < qmin:
-                jointForces[j] = limitK*(qmin - q[j])
-            elif q[j] > qmax:
-                jointForces[j] = limitK*(qmax - q[j])
+    #     # Gelenkgrenzen prüfen
+    #     for j, (qmin, qmax) in jointLimits.items():
+    #         if q[j] < qmin:
+    #             jointForces[j] = limitK*(qmin - q[j])
+    #         elif q[j] > qmax:
+    #             jointForces[j] = limitK*(qmax - q[j])
 
-        return jointForces
+    #     return jointForces
 
 
     # -------------------------------------------------
@@ -269,23 +312,23 @@ def RobotDog(SC, mbs,
         linkMasses=rd.linkMasses,
         baseOffset=[0.,0.,0.],
         gravity=gravity,
-        forceUserFunction=UF_KinematicTreeForces,
+        #forceUserFunction=UF_KinematicTreeForces,
         visualization=VObjectKinematicTree(graphicsDataList=rd.gList)
     ))
 
     rd.mLegs = []
 
-    # KNIE GELENK
-    for i in range(4):
-        rd.mLeg = mbs.AddMarker(MarkerKinematicTreeRigid(objectNumber=rd.oKT,
-                                                    linkNumber=rd.platformIndex+1+i,
-                                                    localPosition=[0,0, -L_thigh]))
-        rd.mLegs.append(rd.mLeg)
-        rd.gContact.AddSphereWithMarker(rd.mLeg,
-                                    radius=0.5*W_leg,
-                                    contactStiffness=1e5,
-                                    contactDamping=1e3,
-                                    frictionMaterialIndex=0)
+    # # KNIE GELENK
+    # for i in range(4):
+    #     rd.mLeg = mbs.AddMarker(MarkerKinematicTreeRigid(objectNumber=rd.oKT,
+    #                                                 linkNumber=rd.platformIndex+1+i,
+    #                                                 localPosition=[0,0, -L_thigh]))
+    #     rd.mLegs.append(rd.mLeg)
+    #     rd.gContact.AddSphereWithMarker(rd.mLeg,
+    #                                 radius=0.5*W_leg,
+    #                                 contactStiffness=1e5,
+    #                                 contactDamping=1e3,
+    #                                 frictionMaterialIndex=0)
         
     # FÜSSE (Ende des Unterschenkels)
     for i in range(4):
@@ -301,39 +344,39 @@ def RobotDog(SC, mbs,
 
 
 
-    # #BODY Points on the Edges of The BODY
-    sph_rad=0.1
-    offsets = [
-        [ L_body/2 - sph_rad,  W_body/2 - sph_rad, -H_body/2 + sph_rad],   # vorne rechts unten
-        [ L_body/2 - sph_rad, -W_body/2 + sph_rad, -H_body/2 + sph_rad],   # vorne links unten
-        [-L_body/2 + sph_rad,  W_body/2 - sph_rad, -H_body/2 + sph_rad],   # hinten rechts unten
-        [-L_body/2 + sph_rad, -W_body/2 + sph_rad, -H_body/2 + sph_rad],   # hinten links unten
+    # # #BODY Points on the Edges of The BODY
+    # sph_rad=0.1
+    # offsets = [
+    #     [ L_body/2 - sph_rad,  W_body/2 - sph_rad, -H_body/2 + sph_rad],   # vorne rechts unten
+    #     [ L_body/2 - sph_rad, -W_body/2 + sph_rad, -H_body/2 + sph_rad],   # vorne links unten
+    #     [-L_body/2 + sph_rad,  W_body/2 - sph_rad, -H_body/2 + sph_rad],   # hinten rechts unten
+    #     [-L_body/2 + sph_rad, -W_body/2 + sph_rad, -H_body/2 + sph_rad],   # hinten links unten
 
-        # [ L_body/2 - sph_rad,  W_body/2 - sph_rad,  H_body/2 - sph_rad],   # vorne rechts oben
-        # [ L_body/2 - sph_rad, -W_body/2 + sph_rad,  H_body/2 - sph_rad],   # vorne links oben
-        # [-L_body/2 + sph_rad,  W_body/2 - sph_rad,  H_body/2 - sph_rad],   # hinten rechts oben
-        # [-L_body/2 + sph_rad, -W_body/2 + sph_rad,  H_body/2 - sph_rad],   # hinten links oben
-    ]
+    #     # [ L_body/2 - sph_rad,  W_body/2 - sph_rad,  H_body/2 - sph_rad],   # vorne rechts oben
+    #     # [ L_body/2 - sph_rad, -W_body/2 + sph_rad,  H_body/2 - sph_rad],   # vorne links oben
+    #     # [-L_body/2 + sph_rad,  W_body/2 - sph_rad,  H_body/2 - sph_rad],   # hinten rechts oben
+    #     # [-L_body/2 + sph_rad, -W_body/2 + sph_rad,  H_body/2 - sph_rad],   # hinten links oben
+    # ]
 
-    rd.markers = []
+    # rd.markers = []
 
-    for pos in offsets:
-        m = mbs.AddMarker(
-            MarkerKinematicTreeRigid(
-                objectNumber=rd.oKT,
-                linkNumber=rd.platformIndex,
-                localPosition=pos
-            )
-        )
-        rd.markers.append(m)
+    # for pos in offsets:
+    #     m = mbs.AddMarker(
+    #         MarkerKinematicTreeRigid(
+    #             objectNumber=rd.oKT,
+    #             linkNumber=rd.platformIndex,
+    #             localPosition=pos
+    #         )
+    #     )
+    #     rd.markers.append(m)
 
-        rd.gContact.AddSphereWithMarker(
-            markerIndex=m,
-            radius=sph_rad,
-            contactStiffness=1e5,
-            contactDamping=1e3,
-            frictionMaterialIndex=0
-        )
+    #     rd.gContact.AddSphereWithMarker(
+    #         markerIndex=m,
+    #         radius=sph_rad,
+    #         contactStiffness=1e5,
+    #         contactDamping=1e3,
+    #         frictionMaterialIndex=0
+    #     )
 
 
 
@@ -397,7 +440,7 @@ exu.StartRenderer()
 mbs.WaitForUserToContinue()
 #mbs.SolveDynamic(simSettings)
 mbs.SolveDynamic(simSettings,
-                  # solverType=exu.DynamicSolverType.VelocityVerlet # Expliziter Solver
+                  solverType=exu.DynamicSolverType.VelocityVerlet # Expliziter Solver
                   ) 
 SC.renderer.DoIdleTasks()
 exu.StopRenderer()
