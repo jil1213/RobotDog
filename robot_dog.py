@@ -381,6 +381,15 @@ def RobotDog(
     mbs.variables['rd'] = rd
     mbs.variables['trajectory'] = rd.trajectory
 
+    # intialize variables for RL training
+    mbs.variables['legsInit'] = [
+        0.0, 0.0, 0.0, 0.0,       # HipX FL,FR,BL,BR
+        0.0, 0.0, 0.0, 0.0,       # HipY FL,FR,BL,BR
+        -0.1, -0.1, -0.1, -0.1]    # Knee FL,FR,BL,BR
+    mbs.variables['legMarkers'] = rd.mLegs
+    mbs.variables['legRadius'] = W_leg
+    mbs.variables['zContact'] = zContact
+
     return mbs, SC, rd.oKT, rd.nKT
 
 
