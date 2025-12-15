@@ -1,464 +1,631 @@
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# This is an EXUDYN example
+#
+# Details:  This file shows reinfocement learning for spotModel.py (has to be in same folder)
+#
+# Author:   Johannes Gerstmayr, Janik Thentie
+# 
+# Date:      2025-03-10
+#
+# Notes:     requires pip install stable-baselines3[extra]
+# 
+# Copyright:This file is part of Exudyn. Exudyn is free software. You can redistribute it and/or modify it under the terms of the Exudyn license. See 'LICENSE.txt' for more details.
+#
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+import sys
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE" #this avoids OMP problems
+
 import exudyn as exu
 from exudyn.utilities import *
-import exudyn.graphics as graphics
+from exudyn.robotics import *
+from exudyn.artificialIntelligence import OpenAIGymInterfaceEnv, spaces, logger
+
+from exudyn.utilities import ObjectGround, VObjectGround, RigidBodyInertia, HTtranslate, HTtranslateY, HT0,\
+                            MarkerNodeCoordinate, LoadCoordinate, LoadSolutionFile
+
+import stable_baselines3
+
+
+print('stable baselines version=',stable_baselines3.__version__)
+
+from stable_baselines3 import PPO, A2C, SAC
+from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.callbacks import BaseCallback
 import numpy as np
+import gym
 
-def RobotDog(SC, mbs,  
-            platformInertia = None,
-            legInertia = None,
-            referenceCoordinates = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0,0,0,0],
-            L_body = 1.0,   #Länge Body
-            W_body = 0.3,
-            H_body = 0.2,
-            platformMass = 5,
-            body_offset = 0.8,  # Fallhöhe des Bodys über dem Boden
-            dimGroundX = 8, dimGroundY = 8,
-            gravity = [0,0,-9.81],
-            L_thigh = 0.3,
-            L_shin  = 0.2,
-            W_leg = 0.1,
-            density = 500,
-            legMass = 0.05,
-            pControl = 0,
-            dControl = 0.02,
-            usePenalty = True, #use penalty formulation in case useGeneralContact=False
-            frictionProportionalZone = 0.01, # own parameter other example has 0.025
-            frictionCoeff = 0.8, stiffnessGround = 1e5,
-            gContact = None, 
-            useGeneralContact = False #generalcontact shows large errors currently
-            ):
-    #add class which can be returned to enable user to access parameters
-    class rd: pass
+import RL_Spot
 
+dtypeNumpy = np.float64
 
-    # -------------------------------------------------
-    # Boden
-    # -------------------------------------------------
+# call this in anaconda prompt:
+#   tensorboard --logdir=./tensorboard_log/
+# open web browser to show progress (reward, loss, ...):
+#   http://localhost:6006/
 
-    k = 10
-    d = 0.01*k
-    frictionCoeff = 0.8 #0.5
-    ss = 1
+hasTensorboard = False
+try:
+    import tensorboard
+    hasTensorboard = True
+    print('output written to tensorboard, start tensorboard to see progress!')
+except:
+    pass
 
-    planeL = 16
-
-    zContact = -0.7+0.01214+6.45586829e-02 #contact at beginning, leg = [0,0.2*pi,-0.3*pi]
-    p0 = [0,0,0]
-    mbs.variables['zContact'] = zContact
-
-    rd.gGroundSimple = graphics.CheckerBoard(p0,size=planeL, nTiles=1) #only 1 tile for efficiency
-
-    rd.gGround = graphics.CheckerBoard(p0,size=planeL, nTiles=16)
-    rd.oGround = mbs.AddObject(ObjectGround(referencePosition=[0,0,0],
-                                        visualization=VObjectGround(graphicsData=[rd.gGround])))
-
-    rd.mGround = mbs.AddMarker(MarkerBodyRigid(bodyNumber=rd.oGround))
-
-    ###   Kontakt mit dem Boden ------
-    rd.frictionCoeff = frictionCoeff
-    rd.stiffnessGround = stiffnessGround
-    rd.dampingGround = rd.stiffnessGround*0.01
-    #if gContact == None and useGeneralContact: # it has to be initialized all the time to run the simulation
-    frictionIndexGround = 0
-    frictionIndexFree = 1
-
-    rd.gContact = mbs.AddGeneralContact()
-    rd.gContact.frictionProportionalZone = 0.01
-
-    rd.gContact.SetFrictionPairings(frictionCoeff*np.eye(1))
-    rd.gContact.SetSearchTreeCellSize(numberOfCells=[ss,ss,1])
-    # WICHTIG: Suchbaum-Box manuell setzen (verhindert "size must not be zero")
-    stFact = 0.3
-    rd.gContact.SetSearchTreeBox(pMin=np.array([-0.5*planeL*stFact,-0.5*planeL*stFact,-1]),
-                               pMax=np.array([0.5*planeL*stFact,0.5*planeL*stFact,0.1]))
-
-    [meshPoints, meshTrigs] = graphics.ToPointsAndTrigs(rd.gGroundSimple)
-
-    rd.gContact.AddTrianglesRigidBodyBased(
-        rigidBodyMarkerIndex = rd.mGround,
-        contactStiffness = k,
-        contactDamping = d,
-        frictionMaterialIndex = 0,
-        pointList = meshPoints,
-        triangleList = meshTrigs,
-        staticTriangles=False,
-    )
-    ### End eKontakt mit dem Boden ------
-
-    # -------------------------------------------------
-    # Inertias
-    # -------------------------------------------------
-    if platformInertia is None:
-        rd.platformInertia = InertiaCuboid(density, [L_body, W_body, H_body]).Translated([0,0,0])
-    else: 
-        rd.platformInertia = RigidBodyInertia(mass=platformMass, inertiaTensorAtCOM=np.diag(platformInertia))
-    if legInertia is None:
-        rd.thighInertia = InertiaCylinder(density, length=L_thigh, outerRadius=0.5 *W_leg, axis=2).Translated([0,0,0])
-        rd.shinInertia = InertiaCylinder(density, length=L_shin, outerRadius=0.5 *W_leg, axis=2).Translated([0,0,0])
-    else: 
-        rd.thighInertia = RigidBodyInertia(mass=legMass, inertiaTensorAtCOM=np.diag(legInertia))
-        rd.shinInertia  = RigidBodyInertia(mass=legMass, inertiaTensorAtCOM=np.diag(legInertia))
-
-    # -------------------------------------------------
-    # Node
-    # -------------------------------------------------
-    # 3 Plattform XYZ-Translation + 3 Plattform Drehung + 4 Hüfte + 4 Knie = 14 DOF
-    rd.nJoints = 3 + 3 + 4 + 4 + 4
-    # referenceCoordinates = [0]*rd.nJoints
-    deg=math.pi/180
-
-    # initialAngles = [
-    #     0,0,body_offset,0,0,0,
-    #     -40*deg,  # Hüfte vorne links
-    #     -40*deg,  # Hüfte vorne rechts
-    #     -80*deg,  # Hüfte hinten links
-    #     -80*deg,  # Hüfte hinten rechts
-    #     70*deg,   # Knie vorne links
-    #     70*deg,   # Knie vorne rechts
-    #     120*deg,  # Knie hinten links
-    #     120*deg   # Knie hinten rechts
-    # ]
-    initialAngles = [
-        0,0,body_offset,0,0,0,
-    0,0,0,0,0,0,0,0,-0.1,-0.1,-0.1,-0.1
-    ]
-
-
-    rd.nKT = mbs.AddNode(NodeGenericODE2(
-        referenceCoordinates=referenceCoordinates,
-        initialCoordinates=initialAngles,
-        initialCoordinates_t=[0]*rd.nJoints,
-        numberOfODE2Coordinates=rd.nJoints))
-
-    # -------------------------------------------------
-    # KinematicTree
-    # -------------------------------------------------
-    # 6 Gelenke der Plattform
-    rd.jointTypes = [
-        exu.JointType.PrismaticX,
-        exu.JointType.PrismaticY,
-        exu.JointType.PrismaticZ,
-        exu.JointType.RevoluteX,  
-        exu.JointType.RevoluteY,
-        exu.JointType.RevoluteZ,
-    ]
-
-    # 4 Hüftgelenke X-Achse
-    rd.jointTypes += [exu.JointType.RevoluteX]*4
-    
-    # 4 Hüftgelenke Y-Achse
-    rd.jointTypes += [exu.JointType.RevoluteY]*4
-
-    # 4 Kniegelenke
-    rd.jointTypes += [exu.JointType.RevoluteY]*4
-
-
-    #rd.linkParents = [-1, 0, 1, 2, 3, 4, 5, 5, 5, 5,5,5,5,5, 6, 7, 8, 9] #    
-
-    rd.linkParents = [
-        -1, 0, 1, 2, 3, 4,   # 0–5 Floating base
-
-        5,   # 6  HipX FR
-        5,   # 7  HipX BR
-        5,   # 8  HipX FL
-        5,   # 9  HipX BL
-        6,   # 10 HipY FR
-        7,   # 11 HipY BR
-        8,   # 12 HipY FL
-        9,   # 13 HipY BL
-
-        10,   # 14 Knee FL
-        11,   # 15 Knee FR
-        12,  # 16 Knee BL
-        13   # 17 Knee BR
-    ]
-
-
-    rd.platformIndex = 5
-    print(len(rd.jointTypes))
-
-    # -------------------------------------------------
-    # Grafik
-    # -------------------------------------------------
-    rd.gBody = [
-        graphics.Brick([0, 0, 0],
-                    [L_body, W_body, H_body],
-                    color=graphics.color.red),
-        graphics.Basis(length=0.2)
-    ]
-
-    rd.gThigh = [
-        graphics.Cylinder([0,0,0], [0,0,-L_thigh], W_leg*0.5, color=graphics.color.blue),
-        graphics.Basis(length=0.1)
-    ]
-
-    rd.gShin = [
-        graphics.Cylinder([0,0,0], [0,0,-L_shin], W_leg*0.4, color=graphics.color.green),
-        graphics.Basis(length=0.1)
-    ]
-    
-    rd.gZero =[]
-
-    # -------------------------------------------------
-    # JointOffsets, Massen, COMs
-    # -------------------------------------------------
-    rd.jointTransformations = exu.Matrix3DList()
-    rd.jointOffsets = exu.Vector3DList()
-    rd.linkCOMs = exu.Vector3DList()
-    rd.linkInertiasCOM = exu.Matrix3DList()
-    rd.linkMasses = []
-    rd.gList = []
-
-    # Standard Transformation (keine Drehung)
-    for i in range(len(rd.jointTypes)):
-        rd.jointTransformations.Append(np.eye(3))
-
-    # Ersten 6 Gelenke sind Masselos 
-    for i in range(5):
-        rd.jointOffsets.Append([0,0,0])
-        rd.linkInertiasCOM.Append(np.zeros((3,3)))
-        rd.linkCOMs.Append([0,0,0])
-        rd.linkMasses.append(0)
-        rd.gList.append([])
-
-    # Plattform
-    rd.jointOffsets.Append([0,0,0])
-    rd.linkInertiasCOM.Append(rd.platformInertia.InertiaCOM())
-    rd.linkCOMs.Append(rd.platformInertia.COM())
-    rd.linkMasses.append(rd.platformInertia.Mass())
-    rd.gList.append(rd.gBody)
-
-    # Hüften (4 Oberschenkelaufhängungen)
-    hipX = 0.5*L_body
-    hipY = 0.5*W_body + 0.5*W_leg
-    hipZ = 0
-
-    rd.hipPositions = [
-        [-hipX,  hipY, hipZ],
-        [ hipX,  hipY, hipZ],
-        [-hipX, -hipY, hipZ],
-        [ hipX, -hipY, hipZ]
-    ]
-
-    # Oberschenkel X-Achse
-    for pos in rd.hipPositions:
-        rd.jointOffsets.Append(pos)
-        rd.linkInertiasCOM.Append(np.zeros((3,3)))
-        rd.linkCOMs.Append([0,0,0])
-        rd.linkMasses.append(0)
-        rd.gList.append(rd.gZero)
-
-    # Oberschenkel Y-Achse
-
-    rd.hipPositions = np.zeros((4,3))
-
-    for pos in rd.hipPositions:
-        rd.jointOffsets.Append(pos)
-        rd.linkInertiasCOM.Append(rd.thighInertia.InertiaCOM())
-        rd.linkCOMs.Append(rd.thighInertia.COM())
-        rd.linkMasses.append(rd.thighInertia.Mass())
-        rd.gList.append(rd.gThigh)
-
-
- 
-
-    # Kniegelenk sitzt am Ende des Oberschenkels
-    for i in range(4):
-        rd.jointOffsets.Append([0,0,-L_thigh])  # Knie am Beinende
-        rd.linkInertiasCOM.Append(rd.shinInertia.InertiaCOM())
-        rd.linkCOMs.Append(rd.shinInertia.COM())
-        rd.linkMasses.append(rd.shinInertia.Mass())
-        rd.gList.append(rd.gShin)
-
-
-
-
-
-    # def UF_KinematicTreeForces(mbs, t, itemIndex, q, q_t):
-    #     # q = alle Gelenkkoordinaten
-    #     # q_t = Gelenkgeschwindigkeiten
-
-    #     # ---- JOINT LIMITS ----
-    #     deg = np.pi/180
-    #     limitK = 2000
-
-    #     jointLimits = {
-    #         6: (-90*deg,  90*deg),   # Hüften
-    #         7: (-90*deg,  90*deg),
-    #         8: (-90*deg,  90*deg),
-    #         9: (-90*deg,  90*deg),
-
-    #         10: (-90*deg, -10*deg),   # Knie
-    #         11: (-90*deg, -10*deg),
-    #         12: (-90*deg, -10*deg),
-    #         13: (-90*deg, -10*deg),
-    #     }
-
-    #     # Ausgang: Nullkräfte
-    #     jointForces = [0]*len(q)
-
-    #     # Gelenkgrenzen prüfen
-    #     for j, (qmin, qmax) in jointLimits.items():
-    #         if q[j] < qmin:
-    #             jointForces[j] = limitK*(qmin - q[j])
-    #         elif q[j] > qmax:
-    #             jointForces[j] = limitK*(qmax - q[j])
-
-    #     return jointForces
-
-
-    # -------------------------------------------------
-    # KinematicTree Objekt
-    # -------------------------------------------------
-    rd.oKT = mbs.AddObject(ObjectKinematicTree(
-        nodeNumber=rd.nKT,
-        jointTypes=rd.jointTypes,
-        linkParents=rd.linkParents,
-        jointTransformations=rd.jointTransformations,
-        jointOffsets=rd.jointOffsets,
-        linkInertiasCOM=rd.linkInertiasCOM,
-        linkCOMs=rd.linkCOMs,
-        linkMasses=rd.linkMasses,
-        baseOffset=[0.,0.,0.],
-        gravity=gravity,
-        #forceUserFunction=UF_KinematicTreeForces,
-        visualization=VObjectKinematicTree(graphicsDataList=rd.gList)
-    ))
-
-    rd.mLegs = []
-
-    # KNIE GELENK
-    # for i in range(4):
-    #     rd.mLeg = mbs.AddMarker(MarkerKinematicTreeRigid(objectNumber=rd.oKT,
-    #                                                 linkNumber=14+i, # 14 = erster Shin Link
-    #                                                 localPosition=[0,0, -L_thigh]))
-    #     rd.mLegs.append(rd.mLeg)
-    #     rd.gContact.AddSphereWithMarker(rd.mLeg,
-    #                                 radius=0.5*W_leg,
-    #                                 contactStiffness=1e5,
-    #                                 contactDamping=1e3,
-    #                                 frictionMaterialIndex=0)
+class RewardLoggingCallback(BaseCallback):
+    def __init__(self, verbose=0, log_dir = 'solution', 
+                 bestModelName='best_model', 
+                 nEnvs=1, #should be number of vector environments (1 in case of single env)
+                 ):
+        super(RewardLoggingCallback, self).__init__(verbose)
+        self.log_dir = log_dir
+        self.save_path = os.path.join(log_dir, bestModelName)
+        self.bestRewardSum = 0
+        self.bestRewardSumPrint = 0
+        self.rolloutsSinceLastSaved = 0
+        self.stepsLastSaved = 0
+        self.nSteps = 0
+        self.nEnvs = nEnvs
         
-    # FÜSSE (Ende des Unterschenkels)
-    for i in range(4):
-        rd.mLeg = mbs.AddMarker(MarkerKinematicTreeRigid(objectNumber=rd.oKT,
-                                                    linkNumber=rd.linkParents[-1]+1+i,
-                                                    localPosition=[0,0, -L_shin]))
-        rd.mLegs.append(rd.mLeg)
-        rd.gContact.AddSphereWithMarker(rd.mLeg,
-                                    radius=W_leg,
-                                    contactStiffness=1e5,
-                                    contactDamping=1e3,
-                                    frictionMaterialIndex=0)
+    #log mean values at rollout end
+    def _on_rollout_end(self) -> None:
+        rewardSum = -1
+        if 'infos' in self.locals:
+            info = self.locals['infos'][-1]
+            # print('infos:', info)
+            if 'rewardMean' in info:
+                self.logger.record("rollout/rewardMean", info['rewardMean'])
+            if 'episodeLen' in info:
+                self.logger.record("rollout/episodeLen", info['episodeLen'])
+            if 'rewardSum' in info:
+                self.logger.record("rollout/rewardSum", info['rewardSum'])
+                rewardSum = info['rewardSum']
+            #print('info:',info)
+        
+        if (rewardSum > 5
+            and self.nSteps > self.stepsLastSaved+20000
+            #and self.rolloutsSinceLastSaved>=10
+            ):
+            try:
+                self.model.save(self.save_path+'_temp')
+                print('save temp model; rewardSum=', round(rewardSum,2), ', steps=',self.nSteps)
+            except:
+                print('save failed (other thread writing?)')
+            self.stepsLastSaved = self.nSteps
+            self.rolloutsSinceLastSaved = 0
+        else:
+            self.rolloutsSinceLastSaved += 1
+            
+        # New best model, you could save the agent here
+        if rewardSum > self.bestRewardSum:
+            self.bestRewardSum = rewardSum
+            # Example for saving best model
+            if rewardSum>50: #other models make no sense, they are too bad
+                if self.verbose > 0 and rewardSum > 1.1*self.bestRewardSumPrint:
+                    self.bestRewardSumPrint = rewardSum
+                    print("Save best model; rewardSum="+str(round(rewardSum,2))+" to "+self.save_path+', steps=',self.nSteps)
+                    try:
+                        self.model.save(self.save_path)
+                    except:
+                        print('save failed (other thread writing?)')
+
+            
+    #log (possibly) every step 
+    def _on_step(self) -> bool:
+        #extract local variables to find reward
+        self.nSteps+=self.nEnvs
+        if 'infos' in self.locals:
+            info = self.locals['infos'][-1]
+
+            if 'reward' in info:
+                self.logger.record("train/reward", info['reward'])
+            #for SAC / A2C in non-vectorized envs, per episode:
+            if 'episode' in info and 'r' in info['episode']:
+                self.logger.record("episode/reward", info['episode']['r'])
+        return True
 
 
+#%%#########################
+addShoulderContact = False
 
-    # # #BODY Points on the Edges of The BODY
-    # sph_rad=0.1
-    # offsets = [
-    #     [ L_body/2 - sph_rad,  W_body/2 - sph_rad, -H_body/2 + sph_rad],   # vorne rechts unten
-    #     [ L_body/2 - sph_rad, -W_body/2 + sph_rad, -H_body/2 + sph_rad],   # vorne links unten
-    #     [-L_body/2 + sph_rad,  W_body/2 - sph_rad, -H_body/2 + sph_rad],   # hinten rechts unten
-    #     [-L_body/2 + sph_rad, -W_body/2 + sph_rad, -H_body/2 + sph_rad],   # hinten links unten
+class SpotEnv(OpenAIGymInterfaceEnv): 
+    # def __init__(self):
+        
+        
+    def CreateMBS(self, SC, mbs, simulationSettings, **kwargs):
+        global addShoulderContact
+        #%%++++++++++++++++++++++++++++++++++++++++++++++             
+        self.doPlanar = False
+        self.useLegContactState = True
+        self.maxDistTarget = 5 #will be written in reset
+        self.target_position = np.array([4, 0*(1-self.doPlanar), 0])
 
-    #     # [ L_body/2 - sph_rad,  W_body/2 - sph_rad,  H_body/2 - sph_rad],   # vorne rechts oben
-    #     # [ L_body/2 - sph_rad, -W_body/2 + sph_rad,  H_body/2 - sph_rad],   # vorne links oben
-    #     # [-L_body/2 + sph_rad,  W_body/2 - sph_rad,  H_body/2 - sph_rad],   # hinten rechts oben
-    #     # [-L_body/2 + sph_rad, -W_body/2 + sph_rad,  H_body/2 - sph_rad],   # hinten links oben
-    # ]
+        self.rendererRunning= None
+        self.useRenderer = False #turn this on if needed       
+        
 
-    # rd.markers = []
+        #%%++++++++++++++++++++++++
+        self.cntCalls = 0
+        
+        self.mbs, self.SC, self.oKT, self.nKT = RL_Spot.GetModel(addShoulderContact=addShoulderContact)
+        self.legsInit = self.mbs.variables['legsInit']
+        self.legMarkers = self.mbs.variables['legMarkers']
+        self.legRadius = self.mbs.variables['legRadius']
+        self.legMarkers = self.mbs.variables['legMarkers']
+        self.zContact = self.mbs.variables['zContact']+0.05
 
-    # for pos in offsets:
-    #     m = mbs.AddMarker(
-    #         MarkerKinematicTreeRigid(
-    #             objectNumber=rd.oKT,
-    #             linkNumber=rd.platformIndex,
-    #             localPosition=pos
-    #         )
-    #     )
-    #     rd.markers.append(m)
+        # print('model loaded!', flush=True)
+        
+        self.targetGraphics = self.mbs.CreateGround(referencePosition=[self.target_position[0], self.target_position[1], -0.5],
+                                                    graphicsDataList=[exu.graphics.Sphere(radius=0.1, nTiles=32, color=[1,0,0,0.2])])
+        self.mbs.Assemble() #computes initial vector
+        
+        self.simulationSettings.timeIntegration.numberOfSteps = 100 #this is the number of solver steps per RL-step
+        self.simulationSettings.timeIntegration.endTime = 0 #will be overwritten in step
+        # self.simulationSettings.timeIntegration.verboseMode = 1
+        self.simulationSettings.solutionSettings.writeSolutionToFile = False #set True only for postprocessing
+        #self.simulationSettings.linearSolverType = exu.LinearSolverType.EigenSparse
+        
+        self.simulationSettings.timeIntegration.explicitIntegration.computeEndOfStepAccelerations = False
+        self.simulationSettings.timeIntegration.explicitIntegration.computeMassMatrixInversePerBody = True
+        
+        
+        self.SC.visualizationSettings.contact.showSpheres = False
+        self.SC.visualizationSettings.general.drawWorldBasis = True
+        self.SC.visualizationSettings.general.drawCoordinateSystem = False
+        self.SC.visualizationSettings.general.graphicsUpdateInterval = 0.2
+        self.SC.visualizationSettings.openGL.multiSampling = 4        
+        self.SC.visualizationSettings.bodies.kinematicTree.showJointFrames = False
+        self.SC.visualizationSettings.openGL.shadow = 0.25
+        
+        self.state = None
+        self.done = False
+        
+        #self.stepUpdateTime = 1 #sek step size for RL-method TOO LARGE!
+        self.stepUpdateTime = 0.02 #0.02 works; sek step size for RL-method
+        self.episodeMaxLen = 300   #250 works; max number of steps before time (e.g. timeout or avoid long episodes where nothing happens)
+        
+        #to track mean reward:
+        self.rewardCnt = 0
+        self.rewardMean = 0
+        
+        #must return state size
+        self.nTotalLinks = 18
+        self.nActuatedJoints = 12
+        self.nLegStates = 4*(self.useLegContactState)
+        stateSize = (self.nTotalLinks)*2 + self.nLegStates #the number of states (position/velocity that are used by learning algorithm)
 
-    #     rd.gContact.AddSphereWithMarker(
-    #         markerIndex=m,
-    #         radius=sph_rad,
-    #         contactStiffness=1e5,
-    #         contactDamping=1e3,
-    #         frictionMaterialIndex=0
-    #     )
+        self.maxAngle = 25 * np.pi/180. #original: 72
+        self.maxVel = 720 * np.pi/180  #original 1*np.pi; translation and rotation
+
+        self.previousSetCoordinates = np.zeros(self.nActuatedJoints)
+        self.useIncrementalSetValues = True #use this to have "velocity" control
+
+        #avoid randomization of start config
+        self.randomInitializationValue = 0 #single float or list
+        #this may be harder:
+        if not self.doPlanar and True:
+             self.randomInitializationValue = [3,2,0, 0,0,0.1*np.pi]+[0]*(self.nTotalLinks*2-6)+[0]*self.nLegStates
+
+        #to track mean reward:
+        self.rewardCnt = 0
+        self.rewardMean = 0        
+        
+        
+        # print('create finished!')
+        return stateSize
+    
+    def PreInitializeSolver(self):
+        self.SetSolver(solverType=exu.DynamicSolverType.ExplicitEuler)
+
+    def SetupSpaces(self):       
+        
+        maxAngleSet = self.maxAngle
+        if self.useIncrementalSetValues:
+            maxAngleSet = self.maxAngle/5 #10
+        
+        self.low = np.array([-5]*6 + [-self.maxAngle*5]*self.nActuatedJoints + [-self.maxVel]*self.nTotalLinks+[-100]*self.nLegStates, dtype=dtypeNumpy)  # Minimale Winkel + Geschindigkeiten
+        self.high = np.array([5]*6 + [self.maxAngle*5]*self.nActuatedJoints + [self.maxVel]*self.nTotalLinks+[1]*self.nLegStates, dtype=dtypeNumpy)   # Maximale Winkel + Geschindigkeiten      
+        
+        self.action_space = self.action_space = spaces.Box(low=np.array([-maxAngleSet]*self.nActuatedJoints, dtype=dtypeNumpy),
+                                       high=np.array([maxAngleSet]*self.nActuatedJoints, dtype=dtypeNumpy), dtype=dtypeNumpy)
+    
+        self.observation_space = spaces.Box(low= self.low, high = self.high, dtype=dtypeNumpy)
+        #+++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+        
+    def MapAction2MBS(self, action):   
+        modAction = np.array(action)
+        
+        if self.doPlanar:
+            modAction[0] = 0
+            modAction[3] = 0
+            modAction[6] = 0
+            modAction[9] = 0
+            modAction[0:3] = 0.5*(modAction[0:3]+modAction[3:6])
+            modAction[6:9] = 0.5*(modAction[6:9]+modAction[9:12])
+            modAction[3:6] = modAction[0:3]
+            modAction[9:12] = modAction[6:9]
+
+        if self.useIncrementalSetValues:
+            #print(np.round(modAction,3))
+            modAction = self.previousSetCoordinates + modAction
+            minSideAngle = 0.1*self.maxAngle #sign depends on side
+            maxSideAngle = 0.4*self.maxAngle #sign depends on side
+            minAngle1 = self.legsInit[1]-self.maxAngle
+            maxAngle1 = self.legsInit[1]+self.maxAngle
+            minAngle2 = self.legsInit[2]-self.maxAngle
+            maxAngle2 = self.legsInit[2]+self.maxAngle
+            modAction = np.clip(modAction, 
+                                [-minSideAngle,minAngle1,minAngle2]+
+                                [-maxSideAngle,minAngle1,minAngle2]+
+                                [-minSideAngle,minAngle1,minAngle2]+
+                                [-maxSideAngle,minAngle1,minAngle2],
+                                [maxSideAngle,maxAngle1,maxAngle2]+
+                                [minSideAngle,maxAngle1,maxAngle2]+
+                                [maxSideAngle,maxAngle1,maxAngle2]+
+                                [minSideAngle,maxAngle1,maxAngle2],
+                                )
+            self.previousSetCoordinates = modAction
+
+        setJoint = list(self.state[:6]) + list(modAction)
+              
+        self.mbs.SetObjectParameter(self.oKT, 'jointPositionOffsetVector', setJoint)
+        
+        
+    def Output2StateAndDone(self):        
+        #+++++++++++++++++++++++++
+        statesVector =  self.mbs.GetNodeOutput(self.nKT, variableType=exu.OutputVariableType.Coordinates)
+        statesVector_t =  self.mbs.GetNodeOutput(self.nKT, variableType=exu.OutputVariableType.Coordinates_t)
+
+        #add position of leg contact relative to ground -> allows RL to see if foot has contact
+        legStates = [0]*self.nLegStates
+        for i in range(self.nLegStates):
+            legStates[i] = self.mbs.GetMarkerOutput(markerNumber=self.legMarkers[i], 
+                                               variableType=exu.OutputVariableType.Position)[2]-self.zContact
+            if legStates[i] > 0: 
+                legStates[i] = 0
+            else:
+                legStates[i] *= 100
+
+        #TODO: add destination to state
+        #      add randomization for destination
+
+        self.state = np.array(list(statesVector) + list(statesVector_t) + legStates, dtype=dtypeNumpy)
+        
+        #done definieren
+        isInObservationSpace = np.all(self.state >= self.low) and np.all(self.state <= self.high)
+        # if not isInObservationSpace:
+        #     print('out of observation space', np.round(self.state,3))
+            
+        done  = (statesVector[2] < -0.4 #-0.4
+                 or abs(statesVector[3]) > 30*np.pi/180 #body points sidewards
+                 or abs(statesVector[4]) > 30*np.pi/180 #body points upwards
+                 or not isInObservationSpace )#werte definieren; floor is at -1
+
+        #timeout
+        time = self.mbs.systemData.GetTime()
+        if time >= self.episodeMaxLen*self.stepUpdateTime:
+            done = True
+
+        #timeout if it does not walk
+        distance_to_target = np.linalg.norm(np.array(self.state[:2]) - np.array(self.target_position[:2]))  # Zielzustand
+        if ((time > 1.5 and self.maxDistTarget-distance_to_target < 0.5*time)
+            ):
+            done = True
+            # print('timeout, dist=',round(self.maxDistTarget-distance_to_target,2),
+            #       ', rew=',round(self.getReward(),2), ', t=',round(time,1))
+
+        #check if solution diverged
+        if np.isnan(self.state).any() or np.isinf(self.state).any() or done:
+            self.state = np.zeros(2*self.nTotalLinks+self.nLegStates, dtype=dtypeNumpy)
+            #print('state is nan')
+            done = True
+
+        
+        # if done: 2
+        #     print('**DONE**')
+        #     print('state=',np.round(self.state,3))
+
+        return done
+    
+    def State2InitialValues(self):
+        # #+++++++++++++++++++++++++++++++++++++++++++++
+        # #to be randomized aufter Strukture is running !!!        
+        # return np.zeros(18*2)  # 6 FHG + 12 Gelenkwinkel
+
+        #+++++++++++++++++++++++++++++++++++++++++++++
+        initialValues = self.state[0:self.nTotalLinks]
+        initialValues_t = self.state[self.nTotalLinks:2*self.nTotalLinks]
+               
+        #set initial values into mbs immediately
+        self.mbs.systemData.SetODE2Coordinates(initialValues, exu.ConfigurationType.Initial)
+        self.mbs.systemData.SetODE2Coordinates_t(initialValues_t, exu.ConfigurationType.Initial)
 
 
+        return [initialValues,initialValues_t]
+
+    def reset(self, *, seed= None,return_info = False,options = None):
+        RV = super().reset(seed=seed, return_info=return_info, options=options)
+                
+        #this function is only called at reset(); so, we can use it to reset the mean reward:
+        self.rewardCnt = 0
+        self.rewardMean = 0
+        
+        #reset incremental set values
+        self.previousSetCoordinates = np.zeros(self.nActuatedJoints)
+        self.previousSetCoordinates += np.array(self.legsInit*4)
+        self.state[:self.nActuatedJoints] += self.previousSetCoordinates
+        
+        self.initialPosition = self.state[0:2]
+        self.maxDistTarget = np.linalg.norm(self.initialPosition - self.target_position[:2])
+
+        self.state = np.array(self.state, dtype=dtypeNumpy)
+        #print('RESET')
+        
+        return RV
+        
+    def step(self, action):
+        err_msg = f"{action!r} ({type(action)}) invalid"
+        assert self.action_space.contains(action), err_msg
+        assert self.state is not None, "Call reset before using step method."
+        #print('step')
+        
+        self.MapAction2MBS(action)
+        self.IntegrateStep() #this is NEEDED for integration!
+        
+        done = self.Output2StateAndDone()
+        # print('state:', np.round(self.state[:6],3), 'done: ', done)
+        #++++++++++++++++++++++++++++++++++++++++++++++++++
+        #compute reward and done
+
+        if not done:
+            reward = self.getReward()
+        elif self.steps_beyond_done is None:
+            # system just fell down
+            self.steps_beyond_done = 0
+            reward = self.getReward()
+        else:
+            
+            if self.steps_beyond_done == 0:
+                logger.warn(
+                    "You are calling 'step()' even though this "
+                    "environment has already returned done = True. You "
+                    "should always call 'reset()' once you receive 'done = "
+                    "True' -- any further steps are undefined behavior."
+                )
+            self.steps_beyond_done += 1
+            reward = 0.0
+
+        self.rewardCnt += 1
+        self.rewardMean += reward
+
+        info = {'reward': reward} #put reward into info for logger
+
+        #compute mean values per episode:
+        if self.rewardCnt != 0: #per epsiode
+            info['rewardMean'] = self.rewardMean / self.rewardCnt
+            info['rewardSum'] = self.rewardMean
+            info['episodeLen'] = self.rewardCnt
+
+        # print('reward=', reward, ', done=',done)
+
+        terminated, truncated = done, False # since stable-baselines3 > 1.8.0 implementations terminated and truncated 
+        return np.array(self.state, dtype=dtypeNumpy), reward, terminated, truncated, info
+        
+
+    def getReward(self):
+        # Berechne eine Belohnung basierend auf dem Zustand und der Aktion
+        reward = 0
+        pos = self.state[:2]
+        vel = self.state[self.nTotalLinks:self.nTotalLinks+2]
+        vecTarget = np.array(self.target_position[:2]) - np.array(pos)
+        distance_to_target = np.linalg.norm(vecTarget)  # Zielzustand
+        distReward = 1-(distance_to_target/(self.maxDistTarget+0.5) ) # rel. Fehler 0 - 1
+
+        #reward moving legs
+        # for i in range(4):
+        #     reward += np.linalg.norm(0.5*vel[self.nTotalLinks+6+3*i+1:self.nTotalLinks+6+3*i+3])
+
+        
+        l = np.linalg.norm(vecTarget)
+        if l != 0: vecTarget /= l
+
+        #add reward for correct velocity
+        velTarget = np.dot(vel,vecTarget)
+        addBodyReward = False
+        breakDistance = 1  #starts to break
+        stopDistance = 0.1 #stops
+        maxVel = 1.5 #1 m/s
+        if distance_to_target > stopDistance:
+            if distance_to_target < breakDistance:
+                maxVel *= distance_to_target/breakDistance+0.1
+                addBodyReward = True
+            reward += 0.5*velTarget
+            if velTarget > maxVel: #avoid robot running too fast
+                reward -= 0.25*(velTarget-maxVel)
+        else:
+            maxVel *= distance_to_target/stopDistance+0.05
+            reward += (1-distance_to_target/stopDistance
+                       + 0.5*(velTarget * distance_to_target/stopDistance)
+                       )
+            if velTarget > maxVel: #avoid robot running too fast
+                reward -= 0.25*(velTarget-maxVel)
+            addBodyReward = True
+
+        if addBodyReward: #don't pitch and roll to much; stay up; final orientation
+            angleOffset = 5 * np.pi/180 #this angle does not lead to decrease of reward
+            angleXOff = max(abs(self.state[3])-angleOffset,0)
+            angleYOff = max(abs(self.state[4])-angleOffset,0)
+            angleZOff = abs(self.state[5])
+            zOff = max(abs(self.state[2])-0.1,0)
+            reward -= 0.5*(angleXOff + angleYOff + angleZOff + zOff) 
 
 
-    sPlatformPos = mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex,
-                                                            storeInternal=True, outputVariableType=exu.OutputVariableType.Position))
-    sPlatformVel = mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex,
-                                                            storeInternal=True, outputVariableType=exu.OutputVariableType.Velocity))
-    sPlatformAng = mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex,
-                                                            storeInternal=True, outputVariableType=exu.OutputVariableType.Rotation))
-    sPlatformAngVel = mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex,
-                                                            storeInternal=True, outputVariableType=exu.OutputVariableType.AngularVelocity))
+        #reward = min(max(reward, 0),1) #not needed, maybe less efficient
+        
+        # self.cntCalls += 1
+        # if self.cntCalls %10 == 0:
+        #     print('reward=',round(reward,2), ',pos=',np.round(pos,3), ',vel=',
+        #           np.round(velTarget,3))
+        
+        return reward
 
 
-    for i in range(8):
-        mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex+1+i,
-                                                                storeInternal=True, outputVariableType=exu.OutputVariableType.Rotation))
-        mbs.AddSensor(SensorKinematicTree(objectNumber=rd.oKT, linkNumber = rd.platformIndex+1+i,
-                                                                storeInternal=True, outputVariableType=exu.OutputVariableType.AngularVelocity))    
+#%%+++++++++++++++++++++++++++++++++++++++++++++
+if __name__ == '__main__': #this is only executed when file is direct called in Python
+    import time
+        
+    #%%++++++++++++++++++++++++++++++++++++++++++++++++++
+    #use some learning algorithm:
+    #pip install stable_baselines3
+    from stable_baselines3 import A2C, SAC    
+    
+    modelName = 'Spot_RL'
+    
+    tensorboard_log = None #no logging
+    rewardCallback = None
+    verbose = 0 #turn off to just view in tensorboard
+    log_interval = 10
+    
+    import torch #stable-baselines3 is based on pytorch
+    torch.set_num_threads(1) #1 seems to be ideal
+    n_cores= os.cpu_count() #n_cores should be number of threads!
+    n_cores = 20
+    doParallel = True
 
+    if hasTensorboard: #only us if tensorboard is available
+        tensorboard_log = "solution/tensorboard_log/" #dir
+        nEnvs = n_cores if doParallel else 1
+        rewardCallback = RewardLoggingCallback(verbose=1, log_dir=tensorboard_log, 
+                                               bestModelName=modelName+'_best',
+                                               nEnvs=nEnvs)
+    else:
+        verbose = 1 #turn on without tensorboard
+    
+    # here the model is loaded (either for vectorized or scalar environment´using SAC or A2C).     
+    def getModel(myEnv, modelType='A2C'):
+        
+        if modelType == 'A2C':
+            model = A2C('MlpPolicy', 
+                        myEnv, 
+                        device='cpu',                                        
+                        tensorboard_log=tensorboard_log,
+                        verbose=verbose)
+            torch.set_num_threads(4) #seems to be better than 1
+        elif modelType == 'SAC':
+            model = SAC('MlpPolicy',
+                  env=myEnv,
+                  learning_rate=3e-4, #3e-4 works
+                  device='cpu', #usually cpu is faster for this size of networks
+                  batch_size=128, #default:256
+                  #target_entropy=0.1,  #default: 'auto'
+                  ent_coef = 'auto_500.',     #default: 'auto'
+                  tensorboard_log=tensorboard_log,
+                  verbose=verbose)
+        elif modelType == 'PPO':
+            model = PPO('MlpPolicy',
+                  env=myEnv,
+                  learning_rate=3e-4, #3e-4 works
+                  device='cpu', #usually cpu is faster for this size of networks
+                  batch_size=64,
+                  tensorboard_log=tensorboard_log,
+                  verbose=verbose)
+        else:
+            raise ValueError('getModel: no available model: '+modelType)
+            
+        return model
 
+    if True: #train
+        
+        if False:
+            env = SpotEnv()
+            env.TestModel(numberOfSteps=2000, seed=42, sleepTime=0.0, useRenderer=True)
+            sys.exit()
+    
+    
+        # modelType = 'PPO'    #40 steps/second
+        # modelType = 'A2C'    #40 steps/second
+        modelType = 'SAC'  #30 steps/second / 28 threads:425 steps/second
+        if modelType == 'PPO': log_interval = 1
+        if modelType == 'A2C': log_interval = 100
+        
+        if not doParallel:
+            env = SpotEnv()
+            showDuringLearning = True
+            #torch.set_num_threads(1) #seems to be best for serial
+    
+            if showDuringLearning:
+                exu.StartRenderer() #do this to see what is done during learning
+            model = getModel(env,modelType=modelType)
+            print('start learning of agent with algorithm: '+modelType)
+        
+            ts = -time.time()
+            model.learn(total_timesteps=int(1e5), 
+                        #progress_bar=True, #requires tqdm and rich package; set True to only see progress and set log_interval very high
+                        log_interval=log_interval, #logs per episode; influences local output and tensorboard
+                        callback = rewardCallback,
+                        )
+        
+            if showDuringLearning:
+                exu.StopRenderer() #do this to see what is done during learning
+        
+        
+        else: #parallel; faster #set verbose=0 in getModel()!
+            
+            print('Train in parallel, using',n_cores,'cores')
+    
+            from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
+            vecEnv = SubprocVecEnv([SpotEnv for i in range(n_cores)])
+            
+        
+            model = getModel(vecEnv,modelType=modelType)
+    
+            ts = -time.time()
+    
+            model.learn(total_timesteps=int(20e6), #A2C starts working above 250k; SAC similar
+                        progress_bar=True, #requires tqdm and rich package; set True to only see progress and set log_interval very high (100_000_000)
+                        log_interval=log_interval, #logs per episode; influences local output and tensorboard
+                        callback = rewardCallback,
+                        )
+        
+            #save learned model
+            model.save("solution/" + modelName)
+        
+        
+        
+        print('*** learning time total =',ts+time.time(),'***')
+        #save learned model
+        model.save("solution/" + modelName)
+    
+    if True: #set True to see what has been learned
+        #%%++++++++++++++++++++++++++++++++++++++++++++++++++
+        #only load and test
+        if True: 
+            model = SAC.load("solution/tensorboard_log/Spot_RL_best")
+            #model = SAC.load("solution/tensorboard_log/Spot_RL_best_temp")
+            #model = SAC.load("solution/" + modelName)
+        
+        addShoulderContact = True
+        env = SpotEnv() #larger threshold for testing
+        solutionFile='solution/learningCoordinates.txt'
+        env.testModel = True
+        env.TestModel(numberOfSteps=250, model=model, solutionFileName=solutionFile, 
+                      stopIfDone=False, useRenderer=True, sleepTime=0.02) #just compute solution file
+    
+        #++++++++++++++++++++++++++++++++++++++++++++++
+        #visualize (and make animations) in exudyn:
+        #SC = exu.SystemContainer() #don't do that, it will be different from mbs!!!
+        
+        if False:
+            pass
+            #%%
+            from exudyn.interactive import SolutionViewer
+            env.SC.visualizationSettings.general.autoFitScene = False
+            solution = LoadSolutionFile(solutionFile)
+            
+            SolutionViewer(env.mbs, solution, timeout=0.005, rowIncrement=2) #loads solution file via name stored in mbs
 
-# -------------------------------------------------
-# Render only Model to check 
-# -------------------------------------------------
-SC = exu.SystemContainer()
-mbs = SC.AddSystem()
-
-useGeneralContact = False
-usePenalty = True
-rd = RobotDog(SC, mbs,useGeneralContact=useGeneralContact, 
-                                usePenalty=usePenalty)
-mbs.Assemble()
-
-
-SC.visualizationSettings.general.drawWorldBasis = True
-SC.visualizationSettings.bodies.kinematicTree.showJointFrames = True
-SC.visualizationSettings.bodies.kinematicTree.frameSize = 0.15
-
-
-simSettings = exu.SimulationSettings()
-
-simSettings.timeIntegration.numberOfSteps = 40000   # 200.000 Schritte (hängt von der Zeit ab)
-simSettings.timeIntegration.endTime = 4           # 4 Sekunden (braucht er ca. zum Umfallen)
-simSettings.timeIntegration.generalizedAlpha.spectralRadius = 0.8
-simSettings.timeIntegration.verboseMode = 1        # Ausgabe an
-simSettings.timeIntegration.discontinuous.useRecommendedStepSize = False
-
-simSettings.linearSolverType = exu.LinearSolverType.EigenSparse # 
-
-# Solver etwas stabiler machen
-simSettings.timeIntegration.newton.useModifiedNewton = True
-simSettings.displayStatistics = True
-
-# -------------------------------------------------
-# Start simulation
-# -------------------------------------------------
-#mbs.SolveDynamic(simSettings)
-
-exu.StartRenderer()
-mbs.WaitForUserToContinue()
-#mbs.SolveDynamic(simSettings)
-mbs.SolveDynamic(simSettings,
-                  solverType=exu.DynamicSolverType.VelocityVerlet # Expliziter Solver
-                  ) 
-SC.renderer.DoIdleTasks()
-exu.StopRenderer()
-mbs.SolutionViewer()
-
-
-# Plot Sensors
-mbs.PlotSensor(sensorNumbers=[0],components=[0],closeAll=True) # Bewegung Plattform in x-Richtung
-mbs.PlotSensor(sensorNumbers=[1],components=[0],closeAll=False) # Geschwingkeit Plattform in x-Richtung
-mbs.PlotSensor(sensorNumbers=[2],components=[2],closeAll=False) # Winkel Plattform
-mbs.PlotSensor(sensorNumbers=[3],components=[2],closeAll=False) # Winkelgeschwingkeit Plattform
 
