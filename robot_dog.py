@@ -336,46 +336,34 @@ def RobotDog(
     # -------------------------------------------------
     # configurations and trajectory
     # -------------------------------------------------
+    
+    # 0-Lage Alle Beine Ausgestreckt
+    q0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-    q0 = [0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    q1 = [0, 0, 0.8, 0, 0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    q2 = [0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    rd.trajectory = Trajectory(initialCoordinates=q0, initialTime=0)
-    rd.trajectory.Add(ProfileConstantAcceleration(q1, 1.0))
-    rd.trajectory.Add(ProfileConstantAcceleration(q2, 1.0))
+    q1 = [0,0,0,0,0,0, # [x, y, z, Rx, Ry, Rz,]
+          np.pi/2,np.pi/2,-np.pi/2,-np.pi/2, # [HipX_FR, HipX_BR, HipX_FL, HipX_BL]
+          0,0,0,0, # [HipY_FR, HipY_BR, HipY_FL, HipY_BL]
+          0,0,0,0] # [Knee_FL, Knee_FR, Knee_BL, Knee_BR]
+    
+    q2 = [0,0,0,0,0,0, # [x, y, z, Rx, Ry, Rz,]
+          0,0,0,0, # [HipX_FR, HipX_BR, HipX_FL, HipX_BL]
+          np.pi/2,np.pi/2,np.pi/2,np.pi/2, # [HipY_FR, HipY_BR, HipY_FL, HipY_BL]
+          0,0,0,0] # [Knee_FL, Knee_FR, Knee_BL, Knee_BR]
+    q3 = [0,0,0,0,0,0, # [x, y, z, Rx, Ry, Rz,]
+          0,0,0,0, # [HipX_FR, HipX_BR, HipX_FL, HipX_BL]
+          0,0,0,0, # [HipY_FR, HipY_BR, HipY_FL, HipY_BL]
+          np.pi/4,np.pi/4,np.pi/4,np.pi/4] # [Knee_FL, Knee_FR, Knee_BL, Knee_BR]
 
-
-    # legsInit = [0,36*pi/180,-54*pi/180.]
-
-    # q0 = np.zeros(rd.nJoints) #zero angle configuration +6 Floating Base
-    # q1 = np.zeros(rd.nJoints) 
-
-    # #test simple motion
-    # #position fpr PD-Control:
-    # #ordering of legs:
-    # #front left, front right, back left, back right
-    # q0 = [0, 0, 0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    # # #q1 = [0,0,0, 0,0,0] + list(np.array(leg))*4
-    # # # q1 = [0,0,0, 0,0,0, 0,0.1*pi,-0.1*pi, 0,0,0, 0,0,0, 0,0,0]
-    # # # q1 = [0,0,0, 0,0,0, 0,0,0, 0,0.1*pi,-0.1*pi, 0,0,0, 0,0,0]
-    # # q1 = [0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0.1*pi,-0.1*pi, 0,0,0]
-    q1 = [0,0,0, 0,0,0, 0.25*pi,0,0,-0.25*pi,0,0,0.25*pi,0,0,-0.25*pi,0,0,]
-    q2 = [0,0,0, 0,0,0, 0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi] # [[0]*6, hip_y, hip_x, knee_x, ....]
-    q3 = [0,0,0, 0,0,0, 0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi] # [[0]*6, hip_y, hip_x, knee_x, ....]
-    q4 = [0,0,0,0,0,0,0,0.5*pi,-0.9*pi,0,0.5*pi,-0.9*pi,0,0,0,0,0,0]
-
-    # q1 = [0,0,0,0,0,0,0,0.4*pi,-0.5*pi,0,0,0,0,0,0,0,0,0] # [[0]*6, hip_y, hip_x, knee_x, ....]
-    # q2 = q0
-
+    
     #trajectory generated with optimal acceleration profiles:
     rd.trajectory = Trajectory(initialCoordinates=q0, initialTime=0)
-    rd.trajectory.Add(ProfileConstantAcceleration(q0,0.3))
-    rd.trajectory.Add(ProfileConstantAcceleration(q1,1))
-    rd.trajectory.Add(ProfileConstantAcceleration(q2,1))
-    rd.trajectory.Add(ProfileConstantAcceleration(q0,0.7))
-    rd.trajectory.Add(ProfileConstantAcceleration(q3,0.7))
-    rd.trajectory.Add(ProfileConstantAcceleration(q4,0.7))
-    rd.trajectory.Add(ProfileConstantAcceleration(q0,0.4))
+    rd.trajectory.Add(ProfileConstantAcceleration(q1,0.2))
+    rd.trajectory.Add(ProfileConstantAcceleration(q0,0.5))
+    rd.trajectory.Add(ProfileConstantAcceleration(q3,0.2))
+    rd.trajectory.Add(ProfileConstantAcceleration(q0,0.5))
+    rd.trajectory.Add(ProfileConstantAcceleration(q2,0.2))
+    
+
 
     mbs.Assemble()
     mbs.variables['rd'] = rd
