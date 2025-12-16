@@ -39,7 +39,7 @@ def RobotDog(
     # Boden
     # -------------------------------------------------
 
-    k = 10e4*0.5
+    k = 10e4
     d = 0.01*k
     frictionCoeff = 0.8 #0.5
     ss = 1
@@ -428,7 +428,7 @@ if __name__ == "__main__":
 
     simSettings = exu.SimulationSettings()
 
-    simSettings.timeIntegration.numberOfSteps = 40000   # 200.000 Schritte (hängt von der Zeit ab)
+    simSettings.timeIntegration.numberOfSteps = 80000   # 200.000 Schritte (hängt von der Zeit ab)
     simSettings.timeIntegration.endTime = 4           # 4 Sekunden (braucht er ca. zum Umfallen)
     simSettings.timeIntegration.generalizedAlpha.spectralRadius = 0.8
     simSettings.timeIntegration.verboseMode = 1        # Ausgabe an
