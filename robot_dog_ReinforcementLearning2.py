@@ -188,7 +188,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
         stateSize = (self.nTotalLinks)*2 + self.nLegStates #the number of states (position/velocity that are used by learning algorithm)
 
         self.maxAngle = 45 * np.pi/180. #original: 72
-        self.maxVel = 720 * np.pi/180  #original 1*np.pi; translation and rotation
+        self.maxVel = 3*720 * np.pi/180  #original 1*np.pi; translation and rotation
 
         self.previousSetCoordinates = np.zeros(self.nActuatedJoints)
         self.useIncrementalSetValues = True #use this to have "velocity" control
@@ -251,7 +251,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
     def MapAction2MBS(self, action):   # todo: not sure if we use the same order: HipX_FL, HipX_FR, HipX_BL, HipX_BR???
         # modAction = np.array(action)
         
-        # if self.doPlanar:
+        # if self.doPlanar: #todo: uncomment and be sure its the same order for us
         #     modAction[0] = 0
         #     modAction[3] = 0
         #     modAction[6] = 0
@@ -688,7 +688,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
             
         return model
 
-    if True: #train
+    if False: #train
         
         if False:
             env = DogEnv()
