@@ -249,19 +249,28 @@ class DogEnv(OpenAIGymInterfaceEnv):
 
         
     def MapAction2MBS(self, action):   # todo: not sure if we use the same order: HipX_FL, HipX_FR, HipX_BL, HipX_BR???
-        # modAction = np.array(action)
+        modAction = np.array(action, dtype=float)
         
-        # if self.doPlanar: #todo: uncomment and be sure its the same order for us
-        #     modAction[0] = 0
-        #     modAction[3] = 0
-        #     modAction[6] = 0
-        #     modAction[9] = 0
-        #     modAction[0:3] = 0.5*(modAction[0:3]+modAction[3:6])
-        #     modAction[6:9] = 0.5*(modAction[6:9]+modAction[9:12])
-        #     modAction[3:6] = modAction[0:3]
-        #     modAction[9:12] = modAction[6:9]
+        # Kopplung von vorne uund hinten diagonal und gespiegelt links und rechts, 
+        # unsere Ordnung der Gelenke: # HipX FL,FR,BL,BR;  HipY FL,FR,BL,BR;  Knee FL,FR,BL,BR
+        if self.doPlanar:
+            modAction[0] = 0 # Sperren der X-bewegung der Hip
+            modAction[1] = 0
+            modAction[2] = 0
+            modAction[3] = 0
 
-        # if self.useIncrementalSetValues:
+            modAction[4] = 0.5*(modAction[4]+modAction[7]) # FL Hip is mean of FL and BR
+            modAction[7] = modAction[4] # BR is same as FL
+            modAction[8] = 0.5*(modAction[8]+modAction[11]) # FL Knee is mean of FL and BR
+            modAction[11] = modAction[8] # BR is same as FL
+
+            modAction[5] = 0.5*(modAction[5]+modAction[6]) # FR Hip is mean of FR and BL
+            modAction[6] = modAction[5] # BL is same as FR
+            modAction[9] = 0.5*(modAction[9]+modAction[10]) # FR Knee is mean of FR and BL
+            modAction[10] = modAction[9] # BL is same as FR
+
+
+        # if self.useIncrementalSetValues: # think we solved this easier and dont need the legsInit (=normal position)
         #     #print(np.round(modAction,3))
         #     modAction = self.previousSetCoordinates + modAction
         #     minSideAngle = 0.1*self.maxAngle #sign depends on side
@@ -286,7 +295,6 @@ class DogEnv(OpenAIGymInterfaceEnv):
               
         # self.mbs.SetObjectParameter(self.oKT, 'jointPositionOffsetVector', setJoint)
 
-        modAction = np.array(action, dtype=float)
 
         # Inkrementell
         target = self.previousSetCoordinates + modAction
