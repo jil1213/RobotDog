@@ -252,22 +252,19 @@ class DogEnv(OpenAIGymInterfaceEnv):
         modAction = np.array(action, dtype=float)
         
         # Kopplung von vorne uund hinten diagonal und gespiegelt links und rechts, 
-        # unsere Ordnung der Gelenke: # HipX FL,FR,BL,BR;  HipY FL,FR,BL,BR;  Knee FL,FR,BL,BR
+        # unsere Ordnung der Gelenke in Action: # HipY FL,FR,BL,BR;  Knee FL,FR,BL,BR
         if self.doPlanar:
-            modAction[0] = 0 # Sperren der X-bewegung der Hip
-            modAction[1] = 0
-            modAction[2] = 0
-            modAction[3] = 0
+            # X-Bewegung der Hip ist bereits gesperrt ist nicht in den Avction einträgen vorhanden
 
-            modAction[4] = 0.5*(modAction[4]+modAction[7]) # FL Hip is mean of FL and BR
+            modAction[0] = 0.5*(modAction[0]+modAction[3]) # FL Hip is mean of FL and BR
+            modAction[3] = modAction[0] # BR is same as FL
+            modAction[4] = 0.5*(modAction[4]+modAction[7]) # FL Knee is mean of FL and BR
             modAction[7] = modAction[4] # BR is same as FL
-            modAction[8] = 0.5*(modAction[8]+modAction[11]) # FL Knee is mean of FL and BR
-            modAction[11] = modAction[8] # BR is same as FL
 
-            modAction[5] = 0.5*(modAction[5]+modAction[6]) # FR Hip is mean of FR and BL
+            modAction[1] = 0.5*(modAction[1]+modAction[2]) # FR Hip is mean of FR and BL
+            modAction[2] = modAction[1] # BL is same as FR
+            modAction[5] = 0.5*(modAction[5]+modAction[6]) # FR Knee is mean of FR and BL
             modAction[6] = modAction[5] # BL is same as FR
-            modAction[9] = 0.5*(modAction[9]+modAction[10]) # FR Knee is mean of FR and BL
-            modAction[10] = modAction[9] # BL is same as FR
 
 
         # if self.useIncrementalSetValues: # think we solved this easier and dont need the legsInit (=normal position)
@@ -340,7 +337,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
             if legStates[i] > 0: 
                 legStates[i] = 0
             else:
-                legStates[i] *= 100
+                legStates[i] *= 10 #changed from 100, drückt Fuß auf den Boden
 
 
         done = False
@@ -696,7 +693,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
             
         return model
 
-    if False: #train
+    if True: #train
         
         if False:
             env = DogEnv()
@@ -741,10 +738,10 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
             vecEnv = SubprocVecEnv([DogEnv for i in range(n_cores)])
             
             if os.path.exists("solution/RobotDog_RL" + ".zip"):
-                print("🔁 Lade vorhandenes Modell und trainiere weiter")
+                print("Lade vorhandenes Modell und trainiere weiter")
                 model = SAC.load("solution/RobotDog_RL", env=vecEnv)
             else:
-                print("🆕 Starte neues Modell")
+                print("Starte neues Modell")
                 model = getModel(vecEnv, modelType="SAC")
             #model = getModel(vecEnv,modelType=modelType)
     
