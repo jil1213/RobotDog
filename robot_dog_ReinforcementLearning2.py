@@ -720,7 +720,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
             print('start learning of agent with algorithm: '+modelType)
         
             ts = -time.time()
-            model.learn(total_timesteps=int(1e5), 
+            model.learn(total_timesteps=int(1e6), # now train longer, changed from 1e5
                         #progress_bar=True, #requires tqdm and rich package; set True to only see progress and set log_interval very high
                         log_interval=log_interval, #logs per episode; influences local output and tensorboard
                         callback = rewardCallback,
