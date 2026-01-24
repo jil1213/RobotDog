@@ -124,7 +124,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
         self.doPlanar = True
         self.useLegContactState = True
         self.maxDistTarget = 5 #will be written in reset
-        self.target_position = np.array([4, 0*(1-self.doPlanar), 0])
+        self.target_position = np.array([4,0, 0]) #np.array([4, 0*(1-self.doPlanar), 0])
 
         self.rendererRunning= None
         self.useRenderer = False #turn this on if needed       
@@ -248,7 +248,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
         #+++++++++++++++++++++++++++++++++++++++++++++++++++++
 
         
-    def MapAction2MBS(self, action):   # todo: not sure if we use the same order: HipX_FL, HipX_FR, HipX_BL, HipX_BR???
+    def MapAction2MBS(self, action):
         modAction = np.array(action, dtype=float)
         
         # Kopplung von vorne uund hinten diagonal und gespiegelt links und rechts, 
@@ -527,7 +527,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
         return np.array(self.state, dtype=dtypeNumpy), reward, terminated, truncated, info
         
 
-    # def getReward(self): # todo: We have to change this for robot dog
+    # def getReward(self):
     #     # Berechne eine Belohnung basierend auf dem Zustand und der Aktion
     #     reward = 0
     #     pos = self.state[:2]
