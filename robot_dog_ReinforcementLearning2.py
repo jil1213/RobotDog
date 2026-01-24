@@ -175,7 +175,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
         
         #self.stepUpdateTime = 1 #sek step size for RL-method TOO LARGE!
         self.stepUpdateTime = 0.02 #0.02 works; sek step size for RL-method
-        self.episodeMaxLen = 30000   #300, 250 works; max number of steps before time (e.g. timeout or avoid long episodes where nothing happens)
+        self.episodeMaxLen = 700   # 250 works; max number of steps before time (e.g. timeout or avoid long episodes where nothing happens)
         
         #to track mean reward:
         self.rewardCnt = 0
@@ -187,7 +187,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
         self.nLegStates = 4*(self.useLegContactState)
         stateSize = (self.nTotalLinks)*2 + self.nLegStates #the number of states (position/velocity that are used by learning algorithm)
 
-        self.maxAngle = 45 * np.pi/180. #original: 72
+        self.maxAngle = 90 * np.pi/180. #original: 72
         self.maxVel = 3*720 * np.pi/180  #original 1*np.pi; translation and rotation
 
         self.previousSetCoordinates = np.zeros(self.nActuatedJoints)
@@ -236,7 +236,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
             + [ self.maxAngle]*4
             + [ self.maxAngle]*self.nActuatedJoints
             + [ self.maxVel]*self.nTotalLinks
-            + [1]*self.nLegStates,
+            + [100]*self.nLegStates,
             dtype=dtypeNumpy
         )
            
@@ -334,11 +334,10 @@ class DogEnv(OpenAIGymInterfaceEnv):
                                                variableType=exu.OutputVariableType.Position)[2]-self.zContact
             # print('leg',i,'z=',round(legStates[i],3), end=', ')
             # print("\n")
-            if legStates[i] > 0: 
-                legStates[i] = 0
+            if legStates[i] > 0.05: 
+                legStates[i] *10 #= 0
             else:
-                legStates[i] *= 10 #changed from 100, drückt Fuß auf den Boden
-
+                legStates[i] =0#*= 10 #changed from 100, drückt Fuß auf den Boden
 
         done = False
 
@@ -609,7 +608,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
 
         # Stabilität
         roll  = abs(self.state[3])
-        pitch = abs(self.state[4])
+        pitch = 0#abs(self.state[4])
         reward -= 0.2 * (roll + pitch)
 
         # Bodenkontakt erzwingen
@@ -618,10 +617,12 @@ class DogEnv(OpenAIGymInterfaceEnv):
         #     reward -= 2.0
 
         contacts = self.state[36:40]   # z-basiert
-        numContacts = np.sum(np.array(contacts) < 0)
+        numContacts = np.sum(np.array(contacts))
 
-        #if numContacts > 2:
-        #    reward -= 1.0
+        if numContacts == 0.0:
+            reward -= 0.3
+        elif numContacts >=0.2:
+            reward += 0.5 * numContacts
 
         return reward
 
@@ -747,7 +748,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
     
             ts = -time.time()
     
-            model.learn(total_timesteps=int(200000), #train longer earlier 200000, A2C starts working above 250k; SAC similar
+            model.learn(total_timesteps=int(2000), #train longer earlier 200000, A2C starts working above 250k; SAC similar
                         progress_bar=True, #requires tqdm and rich package; set True to only see progress and set log_interval very high (100_000_000)
                         log_interval=log_interval, #logs per episode; influences local output and tensorboard
                         callback = rewardCallback,
