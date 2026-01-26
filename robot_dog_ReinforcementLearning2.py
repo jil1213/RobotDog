@@ -742,7 +742,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
     
             ts = -time.time()
     
-            model.learn(total_timesteps=int(200000), #A2C starts working above 250k; SAC similar
+            model.learn(total_timesteps=int(1e6), #A2C starts working above 250k; SAC similar
                         progress_bar=True, #requires tqdm and rich package; set True to only see progress and set log_interval very high (100_000_000)
                         log_interval=log_interval, #logs per episode; influences local output and tensorboard
                         callback = rewardCallback,

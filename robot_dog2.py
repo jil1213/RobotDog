@@ -32,7 +32,7 @@ def GetModel():
 
     k = 10e3
     d = 0.01*k
-    frictionCoeff = 1.5#0.8 #0.5
+    frictionCoeff = 0.8 #0.5 #1.5
     ss = 1
 
     planeL = 16
