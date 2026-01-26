@@ -175,7 +175,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
         
         #self.stepUpdateTime = 1 #sek step size for RL-method TOO LARGE!
         self.stepUpdateTime = 0.02 #0.02 works; sek step size for RL-method
-        self.episodeMaxLen = 300   #250 works; max number of steps before time (e.g. timeout or avoid long episodes where nothing happens)
+        self.episodeMaxLen = 700   #250 works; max number of steps before time (e.g. timeout or avoid long episodes where nothing happens)
         
         #to track mean reward:
         self.rewardCnt = 0
@@ -187,8 +187,8 @@ class DogEnv(OpenAIGymInterfaceEnv):
         self.nLegStates = 4*(self.useLegContactState)
         stateSize = (self.nTotalLinks)*2 + self.nLegStates #the number of states (position/velocity that are used by learning algorithm)
 
-        self.maxAngle = 45 * np.pi/180. #original: 72
-        self.maxVel = 720 * np.pi/180  #original 1*np.pi; translation and rotation
+        self.maxAngle = 90 * np.pi/180. #original: 72
+        self.maxVel = 3*720 * np.pi/180  #original 1*np.pi; translation and rotation
 
         self.previousSetCoordinates = np.zeros(self.nActuatedJoints)
         self.useIncrementalSetValues = True #use this to have "velocity" control
@@ -236,7 +236,7 @@ class DogEnv(OpenAIGymInterfaceEnv):
             + [ self.maxAngle]*4
             + [ self.maxAngle]*self.nActuatedJoints
             + [ self.maxVel]*self.nTotalLinks
-            + [1]*self.nLegStates,
+            + [100]*self.nLegStates,
             dtype=dtypeNumpy
         )
            
@@ -249,44 +249,25 @@ class DogEnv(OpenAIGymInterfaceEnv):
 
         
     def MapAction2MBS(self, action):   # todo: not sure if we use the same order: HipX_FL, HipX_FR, HipX_BL, HipX_BR???
-        # modAction = np.array(action)
-        
-        # if self.doPlanar:
-        #     modAction[0] = 0
-        #     modAction[3] = 0
-        #     modAction[6] = 0
-        #     modAction[9] = 0
-        #     modAction[0:3] = 0.5*(modAction[0:3]+modAction[3:6])
-        #     modAction[6:9] = 0.5*(modAction[6:9]+modAction[9:12])
-        #     modAction[3:6] = modAction[0:3]
-        #     modAction[9:12] = modAction[6:9]
-
-        # if self.useIncrementalSetValues:
-        #     #print(np.round(modAction,3))
-        #     modAction = self.previousSetCoordinates + modAction
-        #     minSideAngle = 0.1*self.maxAngle #sign depends on side
-        #     maxSideAngle = 0.4*self.maxAngle #sign depends on side
-        #     minAngle1 = self.legsInit[1]-self.maxAngle
-        #     maxAngle1 = self.legsInit[1]+self.maxAngle
-        #     minAngle2 = self.legsInit[2]-self.maxAngle
-        #     maxAngle2 = self.legsInit[2]+self.maxAngle
-        #     modAction = np.clip(modAction, 
-        #                         [-minSideAngle,minAngle1,minAngle2]+
-        #                         [-maxSideAngle,minAngle1,minAngle2]+
-        #                         [-minSideAngle,minAngle1,minAngle2]+
-        #                         [-maxSideAngle,minAngle1,minAngle2],
-        #                         [maxSideAngle,maxAngle1,maxAngle2]+
-        #                         [minSideAngle,maxAngle1,maxAngle2]+
-        #                         [maxSideAngle,maxAngle1,maxAngle2]+
-        #                         [minSideAngle,maxAngle1,maxAngle2],
-        #                         )
-        #     self.previousSetCoordinates = modAction
-
-        # setJoint = list(self.state[:6]) + list(modAction)
-              
-        # self.mbs.SetObjectParameter(self.oKT, 'jointPositionOffsetVector', setJoint)
-
         modAction = np.array(action, dtype=float)
+        
+        # Kopplung von vorne uund hinten diagonal und gespiegelt links und rechts, 
+        # unsere Ordnung der Gelenke in Action: # HipY FL,FR,BL,BR;  Knee FL,FR,BL,BR
+        if self.doPlanar:
+            # X-Bewegung der Hip ist bereits gesperrt ist nicht in den Avction einträgen vorhanden
+
+            modAction[0] = 0.5*(modAction[0]+modAction[3]) # FL Hip is mean of FL and BR
+            modAction[3] = modAction[0] # BR is same as FL
+            modAction[4] = 0.5*(modAction[4]+modAction[7]) # FL Knee is mean of FL and BR
+            modAction[7] = modAction[4] # BR is same as FL
+
+            modAction[1] = 0.5*(modAction[1]+modAction[2]) # FR Hip is mean of FR and BL
+            modAction[2] = modAction[1] # BL is same as FR
+            modAction[5] = 0.5*(modAction[5]+modAction[6]) # FR Knee is mean of FR and BL
+            modAction[6] = modAction[5] # BL is same as FR
+
+
+
 
         # Inkrementell
         target = self.previousSetCoordinates + modAction
@@ -329,12 +310,12 @@ class DogEnv(OpenAIGymInterfaceEnv):
                                                variableType=exu.OutputVariableType.Position)[2]-self.zContact
             # print('leg',i,'z=',round(legStates[i],3), end=', ')
             # print("\n")
-            if legStates[i] > 0: 
-                legStates[i] = 0
+            if legStates[i] > 0.05: 
+                legStates[i] *10#= 0
             else:
-                legStates[i] *= 100
+                legStates[i] =0#*= 10 #changed from 100, drückt Fuß auf den Boden
 
-
+        print(legStates)
         done = False
 
         self.state = np.array(list(statesVector) + list(statesVector_t) + legStates, dtype=dtypeNumpy)
@@ -427,49 +408,6 @@ class DogEnv(OpenAIGymInterfaceEnv):
         
 
 
-    # def reset(self, *, seed=None, return_info=False, options=None):
-    #     RV = super().reset(seed=seed, return_info=return_info, options=options)
-
-    #     self.rewardCnt = 0
-    #     self.rewardMean = 0
-
-    #     # --- 1) Initial joint configuration (8 actuated joints)
-    #     self.previousSetCoordinates = np.zeros(self.nActuatedJoints, dtype=dtypeNumpy)
-
-    #     # legsInit = [hipX?, hipY, knee]
-    #     # du steuerst: hipY (4) + knee (4)
-    #     # self.previousSetCoordinates[0:4] = self.legsInit[1]   # hipY
-    #     # self.previousSetCoordinates[4:8] = self.legsInit[2]   # knee
-
-    #     # --- 2) Apply to Exudyn MBS
-    #     base = self.mbs.GetNodeOutput(
-    #         self.nKT, exu.OutputVariableType.Coordinates
-    #     )[:6]
-
-    #     jointVector = (
-    #         [0,0,1,0,0,0] +
-    #         [0]*4 +                                  # hipX (gesperrt)
-    #         list(self.previousSetCoordinates[0:4]) + # hipY
-    #         list(self.previousSetCoordinates[4:8])   # knee
-    #     )
-
-    #     self.mbs.SetObjectParameter(
-    #         self.oKT,
-    #         'jointPositionOffsetVector',
-    #         jointVector
-    #     )
-
-
-    #     # --- 3) Recompute state from physics
-    #     self.Output2StateAndDone()
-
-    #     # --- 4) Target distance bookkeeping
-    #     self.initialPosition = self.state[0:2]
-    #     self.maxDistTarget = np.linalg.norm(
-    #         self.initialPosition - self.target_position[:2]
-    #     )
-
-    #     return RV
 
 
 
@@ -522,63 +460,6 @@ class DogEnv(OpenAIGymInterfaceEnv):
         return np.array(self.state, dtype=dtypeNumpy), reward, terminated, truncated, info
         
 
-    # def getReward(self): # todo: We have to change this for robot dog
-    #     # Berechne eine Belohnung basierend auf dem Zustand und der Aktion
-    #     reward = 0
-    #     pos = self.state[:2]
-    #     vel = self.state[self.nTotalLinks:self.nTotalLinks+2]
-    #     vecTarget = np.array(self.target_position[:2]) - np.array(pos)
-    #     distance_to_target = np.linalg.norm(vecTarget)  # Zielzustand
-    #     distReward = 1-(distance_to_target/(self.maxDistTarget+0.5) ) # rel. Fehler 0 - 1
-    #     reward += distReward *2.0
-
-    #     #reward moving legs
-    #     # for i in range(4):
-    #     #     reward += np.linalg.norm(0.5*vel[self.nTotalLinks+6+3*i+1:self.nTotalLinks+6+3*i+3])
-
-        
-    #     l = np.linalg.norm(vecTarget)
-    #     if l != 0: vecTarget /= l
-
-    #     #add reward for correct velocity
-    #     velTarget = np.dot(vel,vecTarget)
-    #     addBodyReward = False
-    #     breakDistance = 1  #starts to break
-    #     stopDistance = 0.1 #stops
-    #     maxVel = 1.5 #1 m/s
-    #     if distance_to_target > stopDistance:
-    #         if distance_to_target < breakDistance:
-    #             maxVel *= distance_to_target/breakDistance+0.1
-    #             addBodyReward = True
-    #         reward += 0.5*velTarget
-    #         if velTarget > maxVel: #avoid robot running too fast
-    #             reward -= 0.25*(velTarget-maxVel)
-    #     else:
-    #         maxVel *= distance_to_target/stopDistance+0.05
-    #         reward += (1-distance_to_target/stopDistance
-    #                    + 0.5*(velTarget * distance_to_target/stopDistance)
-    #                    )
-    #         if velTarget > maxVel: #avoid robot running too fast
-    #             reward -= 0.25*(velTarget-maxVel)
-    #         addBodyReward = True
-
-    #     if addBodyReward: #don't pitch and roll to much; stay up; final orientation
-    #         angleOffset = 5 * np.pi/180 #this angle does not lead to decrease of reward
-    #         angleXOff = max(abs(self.state[3])-angleOffset,0)
-    #         angleYOff = max(abs(self.state[4])-angleOffset,0)
-    #         angleZOff = abs(self.state[5])
-    #         zOff = max(abs(self.state[2])-0.1,0)
-    #         reward -= 0.1*(angleXOff + angleYOff + angleZOff + zOff) 
-
-
-    #     #reward = min(max(reward, 0),1) #not needed, maybe less efficient
-        
-    #     # self.cntCalls += 1
-    #     # if self.cntCalls %10 == 0:
-    #     #     print('reward=',round(reward,2), ',pos=',np.round(pos,3), ',vel=',
-    #     #           np.round(velTarget,3))
-        
-    #     return reward
 
 
 # state[ 0: 6]  → Body Pose
@@ -597,26 +478,29 @@ class DogEnv(OpenAIGymInterfaceEnv):
 
     def getReward(self):
         reward = 0.0
-
         # Vorwärtsgeschwindigkeit
         vx = self.state[self.nTotalLinks]
         reward += 2 * vx
 
         # Stabilität
         roll  = abs(self.state[3])
-        pitch = abs(self.state[4])
+        pitch = 0#abs(self.state[4])
         reward -= 0.2 * (roll + pitch)
 
-        # Bodenkontakt erzwingen
-        # z = self.state[2]
-        # if z < 0.3:
-        #     reward -= 2.0
+
+        # contacts = self.state[36:40]   # z-basiert
+        # numContacts = np.sum(np.array(contacts) < 0)
+
+        # if numContacts > 2:
+        #     reward -= 1.0
 
         contacts = self.state[36:40]   # z-basiert
-        numContacts = np.sum(np.array(contacts) < 0)
+        numContacts = np.sum(np.array(contacts))
 
-        if numContacts > 2:
-            reward -= 1.0
+        if numContacts == 0.0:
+            reward -= 0.3
+        elif numContacts >=0.2:
+            reward += 0.5 * numContacts
 
         return reward
 
@@ -643,7 +527,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
     import torch #stable-baselines3 is based on pytorch
     torch.set_num_threads(1) #1 seems to be ideal
     n_cores= os.cpu_count() #n_cores should be number of threads!
-    n_cores = 10# 20
+    n_cores = 1# 20
     doParallel = True
 
     if hasTensorboard: #only us if tensorboard is available
@@ -732,13 +616,13 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
             from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
             vecEnv = SubprocVecEnv([DogEnv for i in range(n_cores)])
             
-            if os.path.exists("solution/RobotDog_RL" + ".zip"):
-                print("🔁 Lade vorhandenes Modell und trainiere weiter")
-                model = SAC.load("solution/RobotDog_RL", env=vecEnv)
-            else:
-                print("🆕 Starte neues Modell")
-                model = getModel(vecEnv, modelType="SAC")
-            #model = getModel(vecEnv,modelType=modelType)
+            # if os.path.exists("solution/RobotDog_RL" + ".zip"):
+            #     print("Lade vorhandenes Modell und trainiere weiter")
+            #     model = SAC.load("solution/RobotDog_RL", env=vecEnv)
+            # else:
+            #     print("Starte neues Modell")
+            #     model = getModel(vecEnv, modelType="SAC")
+            model = getModel(vecEnv,modelType=modelType)
     
             ts = -time.time()
     
@@ -782,5 +666,4 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
             solution = LoadSolutionFile(solutionFile)
             
             SolutionViewer(env.mbs, solution, timeout=0.005, rowIncrement=2) #loads solution file via name stored in mbs
-
 
