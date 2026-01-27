@@ -251,10 +251,10 @@ class DogEnv(OpenAIGymInterfaceEnv):
     def MapAction2MBS(self, action):   # todo: not sure if we use the same order: HipX_FL, HipX_FR, HipX_BL, HipX_BR???
         modAction = np.array(action, dtype=float)
         
-        # Kopplung von vorne uund hinten diagonal und gespiegelt links und rechts, 
+        # Kopplung von vorne und hinten diagonal und gespiegelt links und rechts, 
         # unsere Ordnung der Gelenke in Action: # HipY FL,FR,BL,BR;  Knee FL,FR,BL,BR
         if self.doPlanar:
-            # X-Bewegung der Hip ist bereits gesperrt ist nicht in den Avction einträgen vorhanden
+            # X-Bewegung der Hip ist bereits gesperrt ist nicht in den Action einträgen vorhanden
 
             modAction[0] = 0.5*(modAction[0]+modAction[3]) # FL Hip is mean of FL and BR
             modAction[3] = modAction[0] # BR is same as FL
@@ -315,11 +315,10 @@ class DogEnv(OpenAIGymInterfaceEnv):
             else:
                 legStates[i] =0#*= 10 #changed from 100, drückt Fuß auf den Boden
 
-        print(legStates)
         done = False
 
         self.state = np.array(list(statesVector) + list(statesVector_t) + legStates, dtype=dtypeNumpy)
-        #print(self.state)
+
         #done definieren
         isInObservationSpace = np.all(self.state >= self.low) and np.all(self.state <= self.high)
         if not isInObservationSpace:
@@ -328,14 +327,6 @@ class DogEnv(OpenAIGymInterfaceEnv):
             #print(self.high)
             #print(np.array(self.state >= self.low), np.array(self.state <= self.high))
             done=True
-
-
-        # done  = (statesVector[2] < -5 #-0.4
-        #          or abs(statesVector[3]) > 30*np.pi/180 #body points sidewards
-        #          or abs(statesVector[4]) > 30*np.pi/180 #body points upwards
-        #          or not isInObservationSpace )#werte definieren; floor is at -1
-        # if done:
-        #     print('done condition met: z=',round(statesVector[2],3))
 
         #timeout
         time = self.mbs.systemData.GetTime()
@@ -361,16 +352,12 @@ class DogEnv(OpenAIGymInterfaceEnv):
         targetTolerance = 1
         if distance_to_target < targetTolerance:
             done = True
-        
-        # # if done: 2
-        # #     print('**DONE**')
-        # #     print('state=',np.round(self.state,3))
-        
+
         return done
     
     def State2InitialValues(self):
         # #+++++++++++++++++++++++++++++++++++++++++++++
-        # #to be randomized aufter Strukture is running !!!        
+        # #to be randomized aufter Strukture is running !!!
         # return np.zeros(18*2)  # 6 FHG + 12 Gelenkwinkel
 
         #+++++++++++++++++++++++++++++++++++++++++++++
@@ -527,7 +514,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
     import torch #stable-baselines3 is based on pytorch
     torch.set_num_threads(1) #1 seems to be ideal
     n_cores= os.cpu_count() #n_cores should be number of threads!
-    n_cores = 1# 20
+    n_cores = 10# 20
     doParallel = True
 
     if hasTensorboard: #only us if tensorboard is available
@@ -626,7 +613,7 @@ if __name__ == '__main__': #this is only executed when file is direct called in 
     
             ts = -time.time()
     
-            model.learn(total_timesteps=int(1e6), #A2C starts working above 250k; SAC similar
+            model.learn(total_timesteps=int(400000), #1e6 A2C starts working above 250k; SAC similar
                         progress_bar=True, #requires tqdm and rich package; set True to only see progress and set log_interval very high (100_000_000)
                         log_interval=log_interval, #logs per episode; influences local output and tensorboard
                         callback = rewardCallback,

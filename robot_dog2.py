@@ -75,17 +75,6 @@ def GetModel():
     # -------------------------------------------------
     # Inertias
     # -------------------------------------------------
-    # if platformInertia is None:
-    #     platformInertia = InertiaCuboid(density, [L_body, W_body, H_body]).Translated([0,0,0])
-    # else: 
-    #     platformInertia = RigidBodyInertia(mass=platformMass, inertiaTensorAtCOM=np.diag(platformInertia))
-    # if legInertia is None:
-    #     thighInertia = InertiaCylinder(density, length=L_thigh, outerRadius=0.5 *W_leg, axis=2).Translated([0,0,0])
-    #     shinInertia = InertiaCylinder(density, length=L_shin, outerRadius=0.5 *W_leg, axis=2).Translated([0,0,0])
-    # else: 
-    #     thighInertia = RigidBodyInertia(mass=legMass, inertiaTensorAtCOM=np.diag(legInertia))
-    #     shinInertia  = RigidBodyInertia(mass=legMass, inertiaTensorAtCOM=np.diag(legInertia))
-
 
     platformInertia = InertiaCuboid(density, [L_body, W_body, H_body]).Translated([0,0,0])
     thighInertia = InertiaCylinder(density, length=L_thigh, outerRadius=0.5 *W_leg, axis=2).Translated([0,0,0])
@@ -122,14 +111,14 @@ def GetModel():
 
     # 4 Hüftgelenke X-Achse
     jointTypes += [exu.JointType.RevoluteX]*4
-    
+
     # 4 Hüftgelenke Y-Achse
     jointTypes += [exu.JointType.RevoluteY]*4
 
     # 4 Kniegelenke
     jointTypes += [exu.JointType.RevoluteY]*4
 
-    #rd.linkParents = [-1, 0, 1, 2, 3, 4, 5, 5, 5, 5,5,5,5,5, 6, 7, 8, 9] #    
+    #rd.linkParents = [-1, 0, 1, 2, 3, 4, 5, 5, 5, 5,5,5,5,5, 6, 7, 8, 9] #
 
     linkParents = [
         -1, 0, 1, 2, 3, 4,   # 0–5 Floating base
